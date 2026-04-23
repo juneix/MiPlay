@@ -36,10 +36,6 @@ chmod +x deploy.sh manage.sh
 ./deploy.sh
 ```
 
-安装完成后访问 `http://容器宿主机IP:8300` 即可打开 Web 管理界面。
-请确保容器网络为Host。\
-部分情况下，修改配置后容器可能无法自动重启，请手动重启容器。
-
 ### 在线镜像部署
 ```bash
 docker run -d \
@@ -59,6 +55,9 @@ cd MiAir
 docker build -t miair .
 docker run -d --name miair --network=host -e MIAIR_HOSTNAME=你的IP miair
 ```
+安装完成后访问 `http://容器宿主机IP:8300` 即可打开 Web 管理界面。
+请确保容器网络为Host。\
+部分情况下，修改配置后容器可能无法自动重启，请手动重启容器。
 
 ### Docker 相关命令
 ```bash
