@@ -8,11 +8,13 @@
 ### Windows
 *确保设备已安装 Python 3.12+*
 
+前往Release页面下载最新版本
 进入项目目录，使用终端执行
 ```python
 python miair.py
 ```
 程序将自动安装相关依赖库，请确保网络畅通
+安装完成后访问 `http://容器宿主机IP:8300` 即可打开 Web 管理界面。
 
 ### Docker (Thanks @SyunSS)
 ```bash
@@ -30,7 +32,7 @@ chmod +x deploy.sh manage.sh
 ./deploy.sh
 ```
 
-安装完成后访问 `http://容器宿主机IP:8300` 打开 Web 管理界面。
+安装完成后访问 `http://容器宿主机IP:8300` 即可打开 Web 管理界面。
 请确保容器网络为Host。
 
 ## 我们
