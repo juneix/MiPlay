@@ -1,0 +1,11 @@
+services:
+  miplay:
+    image: ghcr.io/juneix/miplay
+    container_name: miplay
+    network_mode: host
+    restart: always
+    environment:
+      - DLNA_PORT=8200
+      - WEB_PORT=8300
+    volumes:
+      - ./conf:/app/conf

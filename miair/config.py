@@ -90,6 +90,21 @@ class Config:
             self.hostname = os.getenv("MIAIR_HOSTNAME", "")
         if not self.hostname:
             self.hostname = self._detect_local_ip()
+        
+        # 端口环境变量支持
+        env_dlna_port = os.getenv("DLNA_PORT")
+        if env_dlna_port:
+            try:
+                self.dlna_port = int(env_dlna_port)
+            except ValueError:
+                pass
+        
+        env_web_port = os.getenv("WEB_PORT")
+        if env_web_port:
+            try:
+                self.web_port = int(env_web_port)
+            except ValueError:
+                pass
 
     @staticmethod
     def _detect_local_ip() -> str:

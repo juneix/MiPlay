@@ -1,0 +1,68 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+    paths-ignore:
+      - 'README.md'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+# 添加权限声明，确保可以推送到 GHCR
+permissions:
+  packages: write
+  contents: read
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      # 拉取当前仓库代码
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # 启用跨架构模拟，支持构建 arm64 镜像
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      # 初始化 Docker Buildx 多平台构建环境
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 登录 GHCR，使用 GitHub 内置令牌推送镜像
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 登录 Docker Hub，使用仓库 secrets 中的账号信息
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      # 将仓库拥有者转成小写，避免 GHCR 命名不兼容
+      - name: Lowercase the repo name
+        id: prep
+        run: echo "repo_lower=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_OUTPUT
+
+      # 构建并推送 amd64/arm64 两个平台镜像
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ steps.prep.outputs.repo_lower }}/miplay:latest
+            ${{ secrets.DOCKER_USER }}/miplay:latest
+            ghcr.io/${{ steps.prep.outputs.repo_lower }}/miplay:${{ github.ref_name }}
+            ${{ secrets.DOCKER_USER }}/miplay:${{ github.ref_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
