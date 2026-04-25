@@ -9,6 +9,7 @@ build/
 
 # IDE
 .vscode/
+.agents/
 .idea/
 *.swp
 *.swo
@@ -27,7 +28,4 @@ nul
 # 系统文件
 .DS_Store
 Thumbs.dbf
-
 *.exe
- 
- 

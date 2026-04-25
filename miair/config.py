@@ -121,19 +121,38 @@ class Config:
         self.plex_server = os.getenv("PLEX_SERVER", self.plex_server)
         self.plex_name = os.getenv("PLEX_NAME", self.plex_name)
 
-    @staticmethod
-    def _detect_local_ip() -> str:
-        """自动检测本机局域网 IP"""
+    def _detect_local_ip(self) -> str:
+        """强制探测物理网卡 IP，排除虚拟网卡 (解决 198.18.0.1 显示 Bug)"""
         import socket
+        import subprocess
+        import re
 
+        # 尝试 1: 通过路由追踪寻找出站 IP
+        target = self.plex_server or "1.1.1.1"
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
+            s.connect((target, 32400))
             ip = s.getsockname()[0]
             s.close()
-            return ip
-        except Exception:
-            return "127.0.0.1"
+            if not ip.startswith("198.18."):
+                return ip
+        except:
+            pass
+
+        # 尝试 2: 在 Mac/Linux 下解析 ifconfig (最保险的物理层搜索)
+        try:
+            # 执行 ifconfig 获取所有网卡信息
+            output = subprocess.check_output(["ifconfig"], text=True)
+            # 正则匹配常见的私有 IP 地址，且排除 198.18 和 127.0.0.1
+            pattern = r'inet\s+(10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+)'
+            matches = re.findall(pattern, output)
+            if matches:
+                # 返回第一个匹配到的物理局域网地址
+                return matches[0][0]
+        except:
+            pass
+
+        return "127.0.0.1"
 
     @property
     def mi_token_home(self) -> str:
