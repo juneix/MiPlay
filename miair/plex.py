@@ -6,10 +6,7 @@ from aiohttp import web, ClientSession
 import plexapi
 from plexapi.myplex import MyPlexAccount
 
-# 核心修正 1：强制锁定全局标识符，确保云端和局域网 ID 绝对一致
-MY_UUID = str(uuid.uuid5(uuid.NAMESPACE_DNS, socket.gethostname() + "-miplay-v12"))
-plexapi.X_PLEX_IDENTIFIER = MY_UUID
-plexapi.BASE_HEADERS['X-Plex-Client-Identifier'] = MY_UUID
+# 移除全局 MY_UUID，改为每个实例基于 DID 生成
 plexapi.BASE_HEADERS['X-Plex-Product'] = 'Plex for Mac'
 plexapi.BASE_HEADERS['X-Plex-Platform'] = 'macOS'
 plexapi.BASE_HEADERS['X-Plex-Provides'] = 'player,music,playback,timeline,navigation,pubsub-player'
@@ -19,11 +16,16 @@ log = logging.getLogger("miair.plex")
 class PlexPlayer:
     """Plex Companion 模拟器 - 深度对齐 Plexamp 投送协议"""
 
-    def __init__(self, miair):
+    def __init__(self, miair, controller=None, port=None):
         self.miair = miair
         self.config = miair.config
-        self.port = self.config.plex_port
-        self.uuid = MY_UUID
+        self.controller = controller
+        self.port = port or self.config.plex_port
+        
+        # 为每个音箱生成唯一的 UUID
+        seed = f"miplay-{controller.did if controller else 'global'}"
+        self.uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, seed))
+        
         self.running = False
         self.current_command_id = "0"
         self.current_key = ""
@@ -47,7 +49,12 @@ class PlexPlayer:
         site = web.TCPSite(self.server_runner, '0.0.0.0', self.port)
         await site.start()
         
-        display_name = self.config.plex_name or f"Plex-{socket.gethostname()}"
+        display_name = self.config.plex_name
+        if self.controller:
+            display_name = self.controller.speaker.get_dlna_name()
+        elif not display_name:
+            display_name = f"Plex-{socket.gethostname()}"
+            
         log.info(f"Plex 模拟播放器启动 [{display_name}]，端口: {self.port}")
 
         # 启动本地广播、查询响应与云端同步
@@ -242,8 +249,11 @@ class PlexPlayer:
         return self._make_response("", content_type="text/plain")
 
     async def _broadcast_to_speakers(self, action, url=None):
-        controllers = getattr(self.miair.speaker_manager, 'controllers', {})
-        for controller in controllers.values():
+        # 如果绑定了具体控制器，只发给它；否则发给所有（向上兼容）
+        target_controllers = [self.controller] if self.controller else self.miair.speaker_manager.controllers.values()
+        
+        for controller in target_controllers:
+            if not controller: continue
             try:
                 if action == "play" and url:
                     await controller.play_url(url)
