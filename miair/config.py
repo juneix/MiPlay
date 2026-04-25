@@ -62,6 +62,8 @@ class Config:
     plex_token: str = ""
     plex_server: str = ""
     plex_name: str = ""
+    plex_target_did: str = ""
+    plex_client_id: str = ""
     conf_path: str = "conf"
     verbose: bool = False
     # log_file 不存储，动态计算相对于 conf_path
@@ -120,6 +122,14 @@ class Config:
         self.plex_token = os.getenv("PLEX_TOKEN", self.plex_token)
         self.plex_server = os.getenv("PLEX_SERVER", self.plex_server)
         self.plex_name = os.getenv("PLEX_NAME", self.plex_name)
+        self.plex_target_did = os.getenv("PLEX_TARGET_DID", self.plex_target_did)
+        self.plex_client_id = os.getenv("PLEX_CLIENT_ID", self.plex_client_id)
+        self.ensure_plex_client_id()
+
+    def ensure_plex_client_id(self):
+        """确保 Plex client identifier 存在且稳定。"""
+        if not self.plex_client_id:
+            self.plex_client_id = str(uuid.uuid4())
 
     def _detect_local_ip(self) -> str:
         """强制探测物理网卡 IP，排除虚拟网卡 (解决 198.18.0.1 显示 Bug)"""
@@ -188,9 +198,17 @@ class Config:
                 result.append(speaker)
         return result
 
+    def get_plex_target_did(self) -> str:
+        """获取有效的 Plex 目标音箱 DID。"""
+        if not self.plex_target_did:
+            return ""
+        enabled_dids = {speaker.did for speaker in self.get_enabled_speakers()}
+        return self.plex_target_did if self.plex_target_did in enabled_dids else ""
+
     def save(self):
         """保存配置到文件（线程安全）"""
         with self._save_lock:
+            self.ensure_plex_client_id()
             os.makedirs(self.conf_path, exist_ok=True)
             data = asdict(self)
             # speakers 中的 Speaker 对象转为 dict
@@ -221,5 +239,10 @@ class Config:
             sig = inspect.signature(cls.__init__)
             valid_params = list(sig.parameters.keys())
             filtered_data = {k: v for k, v in data.items() if k in valid_params}
-            return cls(**filtered_data)
-        return cls(conf_path=conf_path)
+            config = cls(**filtered_data)
+            if "plex_client_id" not in data:
+                config.save()
+            return config
+        config = cls(conf_path=conf_path)
+        config.save()
+        return config

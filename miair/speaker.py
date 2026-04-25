@@ -99,6 +99,19 @@ class SpeakerController:
             log.error(f"set_volume 失败: {e}")
             return False
 
+    async def seek(self, seconds: int) -> bool:
+        """跳转到指定位置 (秒)"""
+        try:
+            await self.auth.ensure_login()
+            # 注意：某些型号可能不支持，或方法名不同
+            # 如果 player_set_progress 不存在，此调用会失败
+            ret = await self.auth.mina_service.player_set_progress(self.device_id, seconds)
+            log.info(f"player_set_progress device_id={self.device_id} seconds={seconds} ret={ret}")
+            return True
+        except Exception as e:
+            log.error(f"seek 失败: {e}")
+            return False
+
     async def get_volume(self) -> int:
         """获取当前音量"""
         try:
@@ -141,6 +154,8 @@ class SpeakerController:
             return {
                 "status": info.get("status", 0),
                 "volume": int(info.get("volume", 0)),
+                "cur_time": int(info.get("cur_time", 0)),
+                "duration": int(info.get("duration", 0)),
             }
         except Exception as e:
             # 向上抛出异常，让调用者（如 DeviceServer 的轮询任务）捕获并忽略本次轮询
@@ -157,20 +172,48 @@ class SpeakerManager:
 
     async def init_speakers(self):
         """初始化所有音箱控制器"""
-        # 从云端获取设备详细信息
-        await self.auth.update_speakers_info()
+        cached_dids = {
+            speaker.did for speaker in self.config.get_enabled_speakers()
+            if speaker.device_id
+        }
+        synced_dids: set[str] = set()
+        refresh_failed = False
+
+        # 从云端获取设备详细信息；失败时允许使用本地缓存继续启动
+        try:
+            synced_dids = await self.auth.update_speakers_info()
+        except Exception as e:
+            refresh_failed = True
+            log.warning(f"云端刷新设备信息失败，尝试使用本地缓存继续启动: {e}")
 
         # 为每个启用的音箱创建控制器
+        used_cached_dids: set[str] = set()
         for speaker in self.config.get_enabled_speakers():
             if speaker.device_id:
                 self.controllers[speaker.did] = SpeakerController(speaker, self.auth)
-                log.info(
-                    f"已初始化音箱控制器: {speaker.get_dlna_name()} (did={speaker.did})"
-                )
+                if speaker.did in synced_dids:
+                    log.info(
+                        f"已初始化音箱控制器: {speaker.get_dlna_name()} (did={speaker.did})"
+                    )
+                elif speaker.did in cached_dids:
+                    used_cached_dids.add(speaker.did)
+                    log.warning(
+                        f"使用本地缓存设备信息初始化音箱: {speaker.get_dlna_name()} "
+                        f"(did={speaker.did}, device_id={speaker.device_id})"
+                    )
+                else:
+                    log.info(
+                        f"已初始化音箱控制器: {speaker.get_dlna_name()} (did={speaker.did})"
+                    )
             else:
                 log.warning(
                     f"音箱 did={speaker.did} 未找到 device_id，跳过"
                 )
+        return {
+            "synced_dids": synced_dids,
+            "used_cached_dids": used_cached_dids,
+            "refresh_failed": refresh_failed,
+        }
 
     def get_controller(self, did: str) -> SpeakerController | None:
         """根据 DID 获取控制器"""

@@ -56,6 +56,12 @@ def create_web_app(config: Config, app_instance) -> web.Application:
             "cookie": config.cookie,
             "dlna_running": app_instance.dlna_running,
             "renderers_count": len(app_instance.renderers),
+            "status_message": app_instance.last_status_message,
+            "plex_port": config.plex_port,
+            "plex_token": config.plex_token,
+            "plex_server": config.plex_server,
+            "plex_name": config.plex_name,
+            "plex_target_did": config.plex_target_did,
             # 实验性功能
             "auto_resume_on_interrupt": config.auto_resume_on_interrupt,
             "resume_delay_seconds": config.resume_delay_seconds,
@@ -70,6 +76,7 @@ def create_web_app(config: Config, app_instance) -> web.Application:
                 "name": speaker.name,
                 "dlna_name": speaker.get_dlna_name(),
                 "hardware": speaker.hardware,
+                "device_id": speaker.device_id,
                 "enabled": speaker.enabled,
             }
         data["speakers"] = speakers_info
@@ -83,13 +90,17 @@ def create_web_app(config: Config, app_instance) -> web.Application:
     async def handle_save_setting(request):
         """保存设置 (账号、密码、cookie、选中的设备)"""
         data = await request.json()
+        auth_changed = False
 
         # 更新账号信息
         if "account" in data:
+            auth_changed = auth_changed or (config.account != data["account"])
             config.account = data["account"]
         if "password" in data:
+            auth_changed = auth_changed or (config.password != data["password"])
             config.password = data["password"]
         if "cookie" in data:
+            auth_changed = auth_changed or (config.cookie != data["cookie"])
             config.cookie = data["cookie"]
 
         # 更新设备选择
@@ -99,6 +110,20 @@ def create_web_app(config: Config, app_instance) -> web.Application:
         # 更新其他配置
         if "auto_play_on_set_uri" in data:
             config.auto_play_on_set_uri = data["auto_play_on_set_uri"]
+
+        if "plex_token" in data:
+            config.plex_token = data["plex_token"]
+        if "plex_server" in data:
+            config.plex_server = data["plex_server"]
+        if "plex_name" in data:
+            config.plex_name = data["plex_name"]
+        if "plex_port" in data:
+            try:
+                config.plex_port = int(data["plex_port"])
+            except (TypeError, ValueError):
+                return web.json_response({"ok": False, "message": "plex_port 必须是数字"}, status=400)
+        if "plex_target_did" in data:
+            config.plex_target_did = data["plex_target_did"]
 
         # 更新实验性功能配置
         if "auto_resume_on_interrupt" in data:
@@ -113,15 +138,24 @@ def create_web_app(config: Config, app_instance) -> web.Application:
                 if "dlna_name" in speaker_data:
                     speaker.dlna_name = speaker_data["dlna_name"]
 
+        if config.plex_target_did and config.plex_target_did not in set(config.get_did_list()):
+            config.plex_target_did = ""
+
         config.save()
 
-        # 先返回响应，然后重启进程
-        resp = web.json_response({"ok": True, "message": "配置已保存，正在重启..."})
+        if auth_changed:
+            log.info("认证信息已更新，重置当前认证状态")
+            await app_instance.auth.close()
+            app_instance.last_status_message = "账号信息已更新，请重新登录验证或重启服务"
+
+        return web.json_response({"ok": True, "message": "配置已保存"})
+
+    async def handle_restart(request):
+        """重启当前服务进程"""
+        resp = web.json_response({"ok": True, "message": "服务正在重启..."})
         await resp.prepare(request)
         await resp.write_eof()
-
-        # 安排进程重启
-        log.info("配置已保存，正在重启进程...")
+        log.info("收到前端重启请求，正在重启进程...")
         asyncio.get_running_loop().call_soon(_restart_process)
         return resp
 
@@ -148,6 +182,9 @@ def create_web_app(config: Config, app_instance) -> web.Application:
     async def handle_get_speakers(request):
         """获取当前运行中的渲染器状态"""
         speakers_info = []
+        plex_snapshot = {}
+        if app_instance.plex_player:
+            plex_snapshot = app_instance.plex_player.get_status_snapshot()
         for did, controller in app_instance.speaker_manager.controllers.items():
             speaker = controller.speaker
             renderer = app_instance.get_renderer_by_did(did)
@@ -165,6 +202,13 @@ def create_web_app(config: Config, app_instance) -> web.Application:
                         airplay_active = True
                         airplay_client = sap.airplay_server.client_name
 
+            plex_bound = did == config.plex_target_did
+            plex_active = bool(
+                plex_bound and plex_snapshot.get("active")
+            )
+            plex_state = plex_snapshot.get("state", "") if plex_bound else ""
+            plex_title = plex_snapshot.get("title", "") if plex_bound else ""
+
             speakers_info.append({
                 "did": did,
                 "name": speaker.name,
@@ -176,6 +220,10 @@ def create_web_app(config: Config, app_instance) -> web.Application:
                 "current_uri": current_uri,
                 "airplay_active": airplay_active,
                 "airplay_client": airplay_client,
+                "plex_active": plex_active,
+                "plex_state": plex_state,
+                "plex_title": plex_title,
+                "plex_bound": plex_bound,
             })
         return web.json_response(speakers_info)
 
@@ -209,12 +257,14 @@ def create_web_app(config: Config, app_instance) -> web.Application:
             "hostname": config.hostname,
             "dlna_port": config.dlna_port,
             "web_port": config.web_port,
+            "plex_port": config.plex_port,
         })
 
     # 注册路由
     web_app.router.add_get("/", handle_index)
     web_app.router.add_get("/api/setting", handle_get_setting)
     web_app.router.add_post("/api/setting", handle_save_setting)
+    web_app.router.add_post("/api/restart", handle_restart)
     web_app.router.add_get("/api/devices", handle_get_devices)
     web_app.router.add_get("/api/speakers", handle_get_speakers)
     web_app.router.add_post("/api/speakers/{did}/rename", handle_rename_speaker)

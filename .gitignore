@@ -15,10 +15,7 @@ build/
 *.swo
 
 # 配置与敏感信息
-conf/config.json
-conf/.mi.token
-conf/*.log
-conf/*.log.*
+conf/
 
 # 运行时产物
 *.log

@@ -35,6 +35,7 @@ class MiAir:
         self.dlna_running = False
         self.airplay_manager: AirPlayManager | None = None
         self.plex_player: PlexPlayer | None = None
+        self.last_status_message: str = ""
 
     def get_renderer_by_did(self, did: str) -> DLNARenderer | None:
         """根据 DID 获取渲染器"""
@@ -58,6 +59,7 @@ class MiAir:
     async def start(self):
         """启动所有服务"""
         self._setup_logging()
+        self.last_status_message = ""
 
         log.info("MiAir 启动中...")
         log.info(f"主机名: {self.config.hostname}")
@@ -81,8 +83,10 @@ class MiAir:
             await self._start_dlna_services()
         else:
             if not self.config.account and not self.config.cookie:
+                self.last_status_message = "未配置小米账号，请先登录账号"
                 log.info("未配置小米账号，请打开 Web 管理界面进行配置")
             elif not self.config.mi_did:
+                self.last_status_message = "未选择音箱设备，请先保存目标音箱"
                 log.info("未选择音箱设备，请打开 Web 管理界面选择设备")
             log.info(f"请访问 http://{self.config.hostname}:{self.config.web_port} 进行配置")
 
@@ -93,10 +97,22 @@ class MiAir:
             await self.auth.login()
 
             # 初始化音箱
-            await self.speaker_manager.init_speakers()
+            init_result = await self.speaker_manager.init_speakers()
             if not self.speaker_manager.controllers:
+                self.last_status_message = (
+                    "已保存音箱，但当前无法验证小米账号或获取设备信息；"
+                    "请重新登录账号后重启服务"
+                )
                 log.warning("没有可用的音箱，请检查配置或重新选择设备")
                 return
+
+            if init_result["used_cached_dids"]:
+                self.last_status_message = (
+                    "小米云刷新失败，已使用本地缓存继续启动音箱服务"
+                )
+                log.warning(self.last_status_message)
+            else:
+                self.last_status_message = ""
 
             # 为每个音箱创建 DLNA 渲染器
             self.ssdp_server = SSDPServer(self.config.hostname, self.config.dlna_port)
@@ -131,6 +147,7 @@ class MiAir:
             log.info("手机 DLNA / AirPlay 现在应该能发现这些设备了")
 
         except Exception as e:
+            self.last_status_message = f"启动失败: {e}"
             log.error(f"启动 DLNA 服务失败: {e}")
 
     async def _start_airplay_for_speakers(self):

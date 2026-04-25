@@ -37,6 +37,7 @@ def parse_args():
     parser.add_argument("--plex-port", type=int, default=0, help="Plex 模拟播放器端口 (默认: 32500)")
     parser.add_argument("--plex-server", default="", help="Plex 服务器 IP 地址 (用于定向发现)")
     parser.add_argument("--plex-name", default="", help="Plex 投送列表显示的名称")
+    parser.add_argument("--plex-target-did", default="", help="Plex 绑定的小爱音箱 DID")
     return parser.parse_args()
 
 
@@ -69,6 +70,8 @@ def main():
         config.plex_server = args.plex_server
     if args.plex_name:
         config.plex_name = args.plex_name
+    if args.plex_target_did:
+        config.plex_target_did = args.plex_target_did
 
     # 启动 (即使没有配置账号/设备也可以启动，用户通过 Web 界面配置)
     from miair.app import MiAir
