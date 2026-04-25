@@ -60,6 +60,17 @@ class SpeakerController:
             log.error(f"pause 失败: {e}")
             return False
 
+    async def play(self) -> bool:
+        """恢复播放"""
+        try:
+            await self.auth.ensure_login()
+            ret = await self.auth.mina_service.player_play(self.device_id)
+            log.info(f"player_play device_id={self.device_id} ret={ret}")
+            return True
+        except Exception as e:
+            log.error(f"play 失败: {e}")
+            return False
+
     async def stop(self) -> bool:
         """停止播放"""
         try:

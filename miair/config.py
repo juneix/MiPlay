@@ -58,6 +58,10 @@ class Config:
     hostname: str = ""
     dlna_port: int = 8200
     web_port: int = 8300
+    plex_port: int = 32500
+    plex_token: str = ""
+    plex_server: str = ""
+    plex_name: str = ""
     conf_path: str = "conf"
     verbose: bool = False
     # log_file 不存储，动态计算相对于 conf_path
@@ -105,6 +109,17 @@ class Config:
                 self.web_port = int(env_web_port)
             except ValueError:
                 pass
+
+        env_plex_port = os.getenv("PLEX_PORT")
+        if env_plex_port:
+            try:
+                self.plex_port = int(env_plex_port)
+            except ValueError:
+                pass
+        
+        self.plex_token = os.getenv("PLEX_TOKEN", self.plex_token)
+        self.plex_server = os.getenv("PLEX_SERVER", self.plex_server)
+        self.plex_name = os.getenv("PLEX_NAME", self.plex_name)
 
     @staticmethod
     def _detect_local_ip() -> str:

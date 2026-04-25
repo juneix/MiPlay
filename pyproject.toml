@@ -11,6 +11,7 @@ dependencies = [
     "zeroconf>=0.38.0",
     "pycryptodome>=3.15.0",
     "av>=10.0.0",
+    "plexapi>=4.15.0",
 ]
 
 [project.scripts]

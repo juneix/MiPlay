@@ -7,5 +7,9 @@ services:
     environment:
       - DLNA_PORT=8200
       - WEB_PORT=8300
+      - PLEX_PORT=32500
+      - PLEX_TOKEN=your_plex_token_here
+      - PLEX_SERVER=your_plex_server_ip
+      - PLEX_NAME=LivingRoomSpeaker
     volumes:
       - ./conf:/app/conf

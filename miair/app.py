@@ -15,6 +15,7 @@ from miair.dlna.ssdp import SSDPServer
 from miair.speaker import SpeakerManager
 from miair.web.api import create_web_app
 from miair.airplay.speaker_airplay import AirPlayManager
+from miair.plex import PlexPlayer
 
 log = logging.getLogger("miair")
 
@@ -33,6 +34,7 @@ class MiAir:
         self._web_runner: web.AppRunner | None = None
         self.dlna_running = False
         self.airplay_manager: AirPlayManager | None = None
+        self.plex_player: PlexPlayer | None = None
 
     def get_renderer_by_did(self, did: str) -> DLNARenderer | None:
         """根据 DID 获取渲染器"""
@@ -69,6 +71,10 @@ class MiAir:
         web_site = web.TCPSite(self._web_runner, "0.0.0.0", self.config.web_port)
         await web_site.start()
         log.info(f"Web 管理界面: http://{self.config.hostname}:{self.config.web_port}")
+        
+        # 1.1 启动 Plex 模拟播放器 (始终启动)
+        self.plex_player = PlexPlayer(self)
+        await self.plex_player.start()
 
         # 2. 如果已有账号和设备配置，启动 DLNA 和 AirPlay 服务
         if (self.config.account or self.config.cookie) and self.config.mi_did:
@@ -171,6 +177,9 @@ class MiAir:
         if self.airplay_manager:
             await self.airplay_manager.stop()
             self.airplay_manager = None
+        if self.plex_player:
+            await self.plex_player.stop()
+            self.plex_player = None
         if self._web_runner:
             # 添加超时，避免卡住
             try:
@@ -197,9 +206,12 @@ class MiAir:
         logger = logging.getLogger("miair")
         logger.setLevel(logging.DEBUG if self.config.verbose else logging.INFO)
 
-        # 抑制 asyncio / aiohttp 内部的连接断开噪音日志
+        # 抑制干扰日志
         logging.getLogger("asyncio").setLevel(logging.CRITICAL)
         logging.getLogger("aiohttp.server").setLevel(logging.WARNING)
+        logging.getLogger("urllib3").setLevel(logging.WARNING)
+        logging.getLogger("charset_normalizer").setLevel(logging.WARNING)
+        logging.getLogger("miservice").setLevel(logging.WARNING)
 
         if logger.handlers:
             return

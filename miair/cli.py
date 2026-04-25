@@ -33,6 +33,10 @@ def parse_args():
     parser.add_argument("--account", default="", help="小米账号")
     parser.add_argument("--password", default="", help="小米密码")
     parser.add_argument("--mi-did", default="", help="设备 DID (逗号分隔)")
+    parser.add_argument("--plex-token", default="", help="Plex X-Plex-Token")
+    parser.add_argument("--plex-port", type=int, default=0, help="Plex 模拟播放器端口 (默认: 32500)")
+    parser.add_argument("--plex-server", default="", help="Plex 服务器 IP 地址 (用于定向发现)")
+    parser.add_argument("--plex-name", default="", help="Plex 投送列表显示的名称")
     return parser.parse_args()
 
 
@@ -57,6 +61,14 @@ def main():
         config.password = args.password
     if args.mi_did:
         config.mi_did = args.mi_did
+    if args.plex_token:
+        config.plex_token = args.plex_token
+    if args.plex_port:
+        config.plex_port = args.plex_port
+    if args.plex_server:
+        config.plex_server = args.plex_server
+    if args.plex_name:
+        config.plex_name = args.plex_name
 
     # 启动 (即使没有配置账号/设备也可以启动，用户通过 Web 界面配置)
     from miair.app import MiAir
