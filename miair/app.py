@@ -48,13 +48,8 @@ class MiAir:
         """获取小米账号下所有设备列表"""
         if not self.config.account and not self.config.cookie:
             return []
-        try:
-            await self.auth.ensure_login()
-            devices = await self.auth.get_device_list()
-            return devices
-        except Exception as e:
-            log.warning(f"获取设备列表失败: {e}")
-            return []
+        await self.auth.ensure_login()
+        return await self.auth.get_device_list()
 
     async def start(self):
         """启动所有服务"""
@@ -97,22 +92,19 @@ class MiAir:
             await self.auth.login()
 
             # 初始化音箱
-            init_result = await self.speaker_manager.init_speakers()
+            synced_dids = await self.speaker_manager.init_speakers()
             if not self.speaker_manager.controllers:
                 self.last_status_message = (
-                    "已保存音箱，但当前无法验证小米账号或获取设备信息；"
-                    "请重新登录账号后重启服务"
+                    "已保存音箱，但本次未从小米云读取到所选设备；"
+                    "请重新登录账号后重试"
                 )
                 log.warning("没有可用的音箱，请检查配置或重新选择设备")
                 return
 
-            if init_result["used_cached_dids"]:
-                self.last_status_message = (
-                    "小米云刷新失败，已使用本地缓存继续启动音箱服务"
-                )
-                log.warning(self.last_status_message)
-            else:
-                self.last_status_message = ""
+            missing_dids = sorted(set(self.config.get_did_list()) - synced_dids)
+            if missing_dids:
+                log.warning(f"部分已选音箱未从小米云读取到，已跳过: {', '.join(missing_dids)}")
+            self.last_status_message = ""
 
             # 为每个音箱创建 DLNA 渲染器
             self.ssdp_server = SSDPServer(self.config.hostname, self.config.dlna_port)

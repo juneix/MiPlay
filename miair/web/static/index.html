@@ -42,7 +42,7 @@
                 "plex devices"
                 "renderers renderers";
             gap: 18px;
-            align-items: stretch;
+            align-items: start;
         }
         @media (max-width: 900px) {
             .dashboard-grid {
@@ -275,9 +275,9 @@
         .footer-text { font-size: 11px; color: var(--text-muted); }
         .dashboard-grid > .card {
             margin-bottom: 0;
-            height: 100%;
             display: flex;
             flex-direction: column;
+            min-height: 0;
         }
         #card-account { grid-area: account; }
         #card-plex { grid-area: plex; }
@@ -286,7 +286,12 @@
         #card-renderers { grid-area: renderers; }
         #card-devices .device-list { min-height: 320px; flex: 1; }
         #card-renderers { min-height: 220px; }
-        #card-renderers #renderers-list { min-height: 140px; flex: 1; }
+        #card-renderers #renderers-list {
+            min-height: 140px;
+            display: grid;
+            gap: 8px;
+            align-content: start;
+        }
         @media (max-width: 900px) {
             .container { padding: 24px 14px 32px; }
             .card { padding: 20px; }
@@ -302,7 +307,7 @@
 <body>
 <div class="container">
     <div class="header">
-        <div class="logo">MiAir</div>
+        <div class="logo">MiPlay</div>
         <div class="tagline">为小爱音箱添加 DLNA / AirPlay 投送支持</div>
     </div>
 
@@ -443,12 +448,7 @@ let currentSetting = {};
 document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
-    await fetchSetting(false);
-    if (!currentSetting.mi_did) {
-        await fetchSetting(true);
-    } else {
-        renderConfiguredDeviceList(currentSetting.speakers || {}, currentSetting.mi_did || '');
-    }
+    await fetchSetting(true);
     startAutoRefresh();
 }
 
@@ -477,7 +477,9 @@ async function fetchSetting(withDeviceList) {
 
         renderPlexTargetOptions();
 
-        if (data.device_list && data.device_list.length > 0) {
+        if (data.device_list_error) {
+            renderDeviceLoadError(data.device_list_error);
+        } else if (data.device_list && data.device_list.length > 0) {
             renderDeviceList(data.device_list, data.mi_did || '');
         } else if (data.has_account && withDeviceList) {
             document.getElementById('device-list').innerHTML = '<div class="loading">未发现设备，请检查账号是否正确</div>';
@@ -560,6 +562,7 @@ function renderDeviceList(devices, selectedDids) {
 
     if (!devices || devices.length === 0) {
         container.innerHTML = '<div class="loading">未发现可用设备</div>';
+        document.getElementById('btn-save').disabled = true;
         return;
     }
 
@@ -572,8 +575,9 @@ function renderDeviceList(devices, selectedDids) {
         const selectedClass = selectedList.includes(did) ? ' selected' : '';
         const deviceInfo = getDeviceInfo(hardware);
         const imagePath = '/static/devicespic/' + deviceInfo.image;
-        const displayName = (currentSetting.speakers && currentSetting.speakers[did])
-            ? currentSetting.speakers[did].dlna_name : name;
+        const speakerInfo = currentSetting.speakers && currentSetting.speakers[did];
+        const displayName = (speakerInfo && speakerInfo.dlna_name)
+            ? speakerInfo.dlna_name : name;
 
         html += '<div class="device-item' + selectedClass + '" onclick="toggleDevice(this)">' +
             '<input type="checkbox" value="' + did + '" ' + checked + ' onclick="event.stopPropagation()">' +
@@ -588,37 +592,10 @@ function renderDeviceList(devices, selectedDids) {
     renderPlexTargetOptions();
 }
 
-function renderConfiguredDeviceList(speakers, selectedDids) {
+function renderDeviceLoadError(message) {
     const container = document.getElementById('device-list');
-    const selectedList = selectedDids ? selectedDids.split(',').filter(Boolean) : [];
-
-    if (!selectedList.length) {
-        container.innerHTML = '<div class="loading">请先登录小米账号</div>';
-        return;
-    }
-
-    let html = '';
-    selectedList.forEach(function(did) {
-        const speaker = speakers[did] || {};
-        const displayName = speaker.dlna_name || speaker.name || ('已选择设备 ' + did);
-        const hardware = speaker.hardware || '';
-        const deviceInfo = getDeviceInfo(hardware);
-        const imagePath = '/static/devicespic/' + deviceInfo.image;
-        const metaParts = [deviceInfo.model];
-        if (hardware) metaParts.push(hardware);
-        if (speaker.device_id) metaParts.push('已缓存');
-
-        html += '<div class="device-item selected" onclick="toggleDevice(this)">' +
-            '<input type="checkbox" value="' + did + '" checked onclick="event.stopPropagation()">' +
-            '<div class="device-image" style="background-image: url(\'' + imagePath + '\')"></div>' +
-            '<div class="device-info">' +
-            '<input type="text" class="device-name-input" value="' + displayName + '" data-did="' + did + '" onblur="saveSpeakerName(this)" onclick="event.stopPropagation()">' +
-            '<div class="device-meta">' + metaParts.join(' · ') + '</div>' +
-            '</div></div>';
-    });
-
-    container.innerHTML = html;
-    document.getElementById('btn-save').disabled = false;
+    container.innerHTML = '<div class="loading">' + message + '</div>';
+    document.getElementById('btn-save').disabled = true;
 }
 
 function renderPlexTargetOptions() {
@@ -633,7 +610,7 @@ function renderPlexTargetOptions() {
     let html = '<option value="">不绑定</option>';
     selectedList.forEach(function(did) {
         const info = currentSetting.speakers && currentSetting.speakers[did];
-        const label = info ? info.dlna_name : did;
+        const label = info ? (info.dlna_name || info.name || did) : did;
         const selected = currentSetting.plex_target_did === did ? ' selected' : '';
         html += '<option value="' + did + '"' + selected + '>' + label + '</option>';
     });
@@ -664,29 +641,25 @@ document.getElementById('btn-fetch-devices').addEventListener('click', async fun
 
     try {
         const cookie = `userId=${userId}; passToken=${passToken}`;
-        await fetch('/api/setting', {
+        const resp = await fetch('/api/setting', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ cookie }),
         });
-
-        const resp = await fetch('/api/devices');
         const data = await resp.json();
 
-        if (data.error) {
-            tip.textContent = data.error;
-            tip.className = 'tip error';
-        } else if (data.devices && data.devices.length > 0) {
-            tip.textContent = '登录成功，发现 ' + data.devices.length + ' 个设备';
+        if (data.ok) {
+            tip.textContent = data.message || '登录信息已保存，服务正在重启...';
             tip.className = 'tip success';
-            renderDeviceList(data.devices, currentSetting.mi_did || '');
+            setTimeout(() => location.reload(), 4000);
         } else {
-            tip.textContent = '未发现可用设备，请检查账号是否正确';
+            tip.textContent = data.message || '保存失败';
             tip.className = 'tip error';
         }
     } catch (e) {
-        tip.textContent = '请求失败: ' + e.message;
-        tip.className = 'tip error';
+        tip.textContent = '登录信息已保存，服务正在重启...';
+        tip.className = 'tip success';
+        setTimeout(() => location.reload(), 4000);
     } finally {
         btn.disabled = false;
         btn.textContent = '登录账号';
@@ -752,13 +725,15 @@ document.getElementById('btn-save').addEventListener('click', async function() {
         if (data.ok) {
             tip.textContent = data.message;
             tip.className = 'tip success';
+            setTimeout(() => location.reload(), 4000);
         } else {
             tip.textContent = data.message || '保存失败';
             tip.className = 'tip error';
         }
     } catch (e) {
-        tip.textContent = '保存失败: ' + e.message;
-        tip.className = 'tip error';
+        tip.textContent = '服务正在重启...';
+        tip.className = 'tip success';
+        setTimeout(() => location.reload(), 4000);
     } finally {
         btn.disabled = false;
         btn.textContent = '保存';
@@ -898,17 +873,19 @@ document.getElementById('btn-save-experimental').addEventListener('click', async
         const data = await resp.json();
 
         if (data.ok) {
-            tip.textContent = '设置已保存';
+            tip.textContent = data.message || '设置已保存';
             tip.className = 'tip success';
             currentSetting.auto_resume_on_interrupt = autoResume;
             currentSetting.resume_delay_seconds = resumeDelay;
+            setTimeout(() => location.reload(), 4000);
         } else {
             tip.textContent = data.message || '保存失败';
             tip.className = 'tip error';
         }
     } catch (e) {
-        tip.textContent = '保存失败: ' + e.message;
-        tip.className = 'tip error';
+        tip.textContent = '服务正在重启...';
+        tip.className = 'tip success';
+        setTimeout(() => location.reload(), 4000);
     } finally {
         btn.disabled = false;
         btn.textContent = '保存';
@@ -950,13 +927,15 @@ document.getElementById('btn-save-plex').addEventListener('click', async functio
         if (data.ok) {
             tip.textContent = data.message || 'Plex 设置已保存';
             tip.className = 'tip success';
+            setTimeout(() => location.reload(), 4000);
         } else {
             tip.textContent = data.message || '保存失败';
             tip.className = 'tip error';
         }
     } catch (e) {
-        tip.textContent = '保存失败: ' + e.message;
-        tip.className = 'tip error';
+        tip.textContent = '服务正在重启...';
+        tip.className = 'tip success';
+        setTimeout(() => location.reload(), 4000);
     } finally {
         btn.disabled = false;
         btn.textContent = '保存';

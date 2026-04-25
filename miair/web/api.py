@@ -82,25 +82,25 @@ def create_web_app(config: Config, app_instance) -> web.Application:
         data["speakers"] = speakers_info
 
         if need_device_list:
-            device_list = await app_instance.get_all_devices()
-            data["device_list"] = device_list
+            try:
+                data["device_list"] = await app_instance.get_all_devices()
+                data["device_list_error"] = ""
+            except Exception as e:
+                data["device_list"] = []
+                data["device_list_error"] = str(e)
 
         return web.json_response(data)
 
     async def handle_save_setting(request):
         """保存设置 (账号、密码、cookie、选中的设备)"""
         data = await request.json()
-        auth_changed = False
 
         # 更新账号信息
         if "account" in data:
-            auth_changed = auth_changed or (config.account != data["account"])
             config.account = data["account"]
         if "password" in data:
-            auth_changed = auth_changed or (config.password != data["password"])
             config.password = data["password"]
         if "cookie" in data:
-            auth_changed = auth_changed or (config.cookie != data["cookie"])
             config.cookie = data["cookie"]
 
         # 更新设备选择
@@ -143,12 +143,13 @@ def create_web_app(config: Config, app_instance) -> web.Application:
 
         config.save()
 
-        if auth_changed:
-            log.info("认证信息已更新，重置当前认证状态")
-            await app_instance.auth.close()
-            app_instance.last_status_message = "账号信息已更新，请重新登录验证或重启服务"
+        resp = web.json_response({"ok": True, "message": "配置已保存，正在重启..."})
+        await resp.prepare(request)
+        await resp.write_eof()
 
-        return web.json_response({"ok": True, "message": "配置已保存"})
+        log.info("配置已保存，正在重启进程...")
+        asyncio.get_running_loop().call_soon(_restart_process)
+        return resp
 
     async def handle_restart(request):
         """重启当前服务进程"""
@@ -161,9 +162,9 @@ def create_web_app(config: Config, app_instance) -> web.Application:
 
     async def handle_get_devices(request):
         """获取小米账号下所有设备列表"""
-        if not config.cookie:
+        if not config.cookie and not config.account:
             return web.json_response(
-                {"error": "请先配置 Cookie"}, status=400
+                {"error": "请先配置小米账号或 Cookie"}, status=400
             )
 
         try:

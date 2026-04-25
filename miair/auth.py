@@ -27,6 +27,10 @@ def parse_cookie_string(cookie_str: str) -> dict:
     return result
 
 
+class DeviceListError(RuntimeError):
+    """获取小米设备列表失败。"""
+
+
 class AuthManager:
     """管理小米账号认证和设备服务"""
 
@@ -153,8 +157,7 @@ class AuthManager:
         """获取账号下所有设备列表"""
         await self.ensure_login()
         if self.mina_service is None:
-            log.warning("小米服务尚未初始化，无法获取设备列表")
-            return []
+            raise DeviceListError("小米服务尚未初始化，无法获取设备列表")
         current_task = self._device_list_task
         if current_task and not current_task.done():
             return await asyncio.shield(current_task)
@@ -176,7 +179,6 @@ class AuthManager:
         try:
             devices = await self.mina_service.device_list()
             devices = devices or []
-            self._cache_devices(devices)
             self._logged_in = True
             if self._cookie_loaded:
                 log.info("cookie API 验证成功")
@@ -188,67 +190,58 @@ class AuthManager:
             # 可能 token 过期，尝试重新登录
             # 但如果使用 cookie 登录，不要重新调用 login（避免 KeyError）
             if self.config.cookie:
-                log.error(f"Cookie 可能已过期，请重新获取: {e}")
-                return []
+                self._cookie_loaded = False
+                raise DeviceListError(f"Cookie 可能已过期，请重新获取: {e}") from e
             await self.close()
             await self.login()
-            if self.mina_service is None:
-                return []
+            if self.mina_service is None or not self._logged_in:
+                raise DeviceListError("重新登录失败，请检查账号密码或完成人机验证")
             try:
                 devices = await self.mina_service.device_list()
                 devices = devices or []
-                self._cache_devices(devices)
                 self._logged_in = True
                 return devices
             except Exception as e2:
                 self._logged_in = False
-                log.error(f"重新登录后仍然失败: {e2}")
-                return []
-
-    def _cache_devices(self, devices: list[dict]) -> set[str]:
-        """把设备列表中的关键字段缓存到配置文件，降低重启后的云端依赖。"""
-        updated_dids: set[str] = set()
-        for device in devices:
-            miot_did = device.get("miotDID", "")
-            if not miot_did:
-                continue
-
-            speaker = self.config.get_speaker(miot_did)
-            changed = False
-
-            device_id = device.get("deviceID", "") or ""
-            hardware = device.get("hardware", "") or ""
-            name = device.get("name", "") or ""
-
-            if device_id and speaker.device_id != device_id:
-                speaker.device_id = device_id
-                changed = True
-            if hardware and speaker.hardware != hardware:
-                speaker.hardware = hardware
-                changed = True
-            if name and speaker.name != name:
-                speaker.name = name
-                changed = True
-
-            speaker.ensure_udn()
-            if changed:
-                updated_dids.add(miot_did)
-
-        if updated_dids:
-            self.config.save()
-            log.info(f"已缓存 {len(updated_dids)} 个小米设备的元数据")
-        return updated_dids
+                raise DeviceListError(f"重新登录后仍然失败: {e2}") from e2
 
     async def update_speakers_info(self) -> set[str]:
         """从云端获取设备信息，更新 speakers 配置"""
         devices = await self.get_device_list()
         did_list = set(self.config.get_did_list())
         synced_dids: set[str] = set()
+        changed = False
+
+        # 严格模式：每次真实刷新前先清空当前选中音箱的关键运行字段，
+        # 避免旧缓存 device_id 冒充本次云端成功结果。
+        for did in did_list:
+            speaker = self.config.get_speaker(did)
+            if speaker.device_id:
+                speaker.device_id = ""
+                changed = True
+            if speaker.hardware:
+                speaker.hardware = ""
+                changed = True
 
         for device in devices:
             miot_did = device.get("miotDID", "")
             if miot_did in did_list:
                 speaker = self.config.get_speaker(miot_did)
+                device_id = device.get("deviceID", "") or ""
+                hardware = device.get("hardware", "") or ""
+                name = device.get("name", "") or ""
+
+                if speaker.device_id != device_id:
+                    speaker.device_id = device_id
+                    changed = True
+                if speaker.hardware != hardware:
+                    speaker.hardware = hardware
+                    changed = True
+                if name and speaker.name != name:
+                    speaker.name = name
+                    changed = True
+
+                speaker.ensure_udn()
                 if speaker.device_id:
                     synced_dids.add(miot_did)
                     log.info(
@@ -256,6 +249,9 @@ class AuthManager:
                         f"(did={miot_did}, device_id={speaker.device_id}, "
                         f"hardware={speaker.hardware})"
                     )
+
+        if changed:
+            self.config.save()
         return synced_dids
 
     def is_logged_in(self) -> bool:

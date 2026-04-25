@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import threading
+from urllib.parse import urlsplit
 
 import aiohttp
 
@@ -39,6 +40,16 @@ class MediaBuffer:
         self._convert_event = asyncio.Event()  # 转换完成事件
         self._supports_range: bool = False  # 服务器是否支持Range请求
 
+    def _request_kwargs(self, total: float, connect: float, allow_redirects: bool = True) -> dict:
+        kwargs = {
+            "timeout": aiohttp.ClientTimeout(total=total, connect=connect),
+            "allow_redirects": allow_redirects,
+        }
+        if urlsplit(self.remote_url).scheme.lower() == "https":
+            # 局域网 Plex 常见为 IP + 自签/plex.direct 证书，严格校验会导致代理拉流失败。
+            kwargs["ssl"] = False
+        return kwargs
+
     @property
     def downloaded_size(self) -> int:
         return len(self.data)
@@ -55,8 +66,7 @@ class MediaBuffer:
             async with session.head(
                 self.remote_url,
                 headers=headers,
-                timeout=aiohttp.ClientTimeout(total=30, connect=10),
-                allow_redirects=True,
+                **self._request_kwargs(total=30, connect=10),
             ) as resp:
                 if resp.status in (200, 206):
                     ct = resp.headers.get("Content-Type")
@@ -112,8 +122,7 @@ class MediaBuffer:
             async with session.get(
                 self.remote_url,
                 headers=headers,
-                timeout=aiohttp.ClientTimeout(total=10, connect=5),
-                allow_redirects=True,
+                **self._request_kwargs(total=10, connect=5),
             ) as resp:
                 if resp.status == 206:  # Partial Content
                     return True
@@ -133,8 +142,7 @@ class MediaBuffer:
         async with session.get(
             self.remote_url,
             headers=headers,
-            timeout=aiohttp.ClientTimeout(total=300, connect=15),
-            allow_redirects=True,
+            **self._request_kwargs(total=300, connect=15),
         ) as resp:
             if resp.status not in (200, 206):
                 self.error = f"HTTP {resp.status}"
@@ -180,8 +188,7 @@ class MediaBuffer:
                     async with session.get(
                         self.remote_url,
                         headers=headers,
-                        timeout=aiohttp.ClientTimeout(total=120, connect=10),
-                        allow_redirects=True,
+                        **self._request_kwargs(total=120, connect=10),
                     ) as resp:
                         if resp.status not in (200, 206):
                             log.error(f"分块下载失败: HTTP {resp.status}")

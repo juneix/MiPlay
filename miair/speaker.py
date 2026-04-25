@@ -172,48 +172,27 @@ class SpeakerManager:
 
     async def init_speakers(self):
         """初始化所有音箱控制器"""
-        cached_dids = {
-            speaker.did for speaker in self.config.get_enabled_speakers()
-            if speaker.device_id
-        }
-        synced_dids: set[str] = set()
-        refresh_failed = False
-
-        # 从云端获取设备详细信息；失败时允许使用本地缓存继续启动
-        try:
-            synced_dids = await self.auth.update_speakers_info()
-        except Exception as e:
-            refresh_failed = True
-            log.warning(f"云端刷新设备信息失败，尝试使用本地缓存继续启动: {e}")
+        synced_dids = await self.auth.update_speakers_info()
+        self.controllers.clear()
 
         # 为每个启用的音箱创建控制器
-        used_cached_dids: set[str] = set()
         for speaker in self.config.get_enabled_speakers():
-            if speaker.device_id:
-                self.controllers[speaker.did] = SpeakerController(speaker, self.auth)
-                if speaker.did in synced_dids:
-                    log.info(
-                        f"已初始化音箱控制器: {speaker.get_dlna_name()} (did={speaker.did})"
-                    )
-                elif speaker.did in cached_dids:
-                    used_cached_dids.add(speaker.did)
-                    log.warning(
-                        f"使用本地缓存设备信息初始化音箱: {speaker.get_dlna_name()} "
-                        f"(did={speaker.did}, device_id={speaker.device_id})"
-                    )
-                else:
-                    log.info(
-                        f"已初始化音箱控制器: {speaker.get_dlna_name()} (did={speaker.did})"
-                    )
-            else:
+            if speaker.did not in synced_dids:
                 log.warning(
-                    f"音箱 did={speaker.did} 未找到 device_id，跳过"
+                    f"音箱 did={speaker.did} 未在本次小米云设备列表中找到，跳过"
                 )
-        return {
-            "synced_dids": synced_dids,
-            "used_cached_dids": used_cached_dids,
-            "refresh_failed": refresh_failed,
-        }
+                continue
+            if not speaker.device_id:
+                log.warning(
+                    f"音箱 did={speaker.did} 缺少有效 device_id，跳过"
+                )
+                continue
+
+            self.controllers[speaker.did] = SpeakerController(speaker, self.auth)
+            log.info(
+                f"已初始化音箱控制器: {speaker.get_dlna_name()} (did={speaker.did})"
+            )
+        return synced_dids
 
     def get_controller(self, did: str) -> SpeakerController | None:
         """根据 DID 获取控制器"""

@@ -6,6 +6,7 @@
 
 import asyncio
 import base64
+import ipaddress
 import logging
 import os
 import socket
@@ -52,6 +53,32 @@ AIRPORT_PRIVATE_KEY = (
     "2gG0N5hvJpzwwhbhXqFKA4zaaSrw622wDniAK5MlIE0tIAKKP4yxNGjoD2QYjhBGuhvkWKY=\n"
     "-----END RSA PRIVATE KEY-----"
 )
+
+
+def _resolve_advertise_ip(hostname: str) -> str:
+    """优先使用配置中的局域网 IP，避免误用 tun/虚拟网卡地址。"""
+    try:
+        ipaddress.ip_address(hostname)
+        if hostname not in {"0.0.0.0", "127.0.0.1"}:
+            return hostname
+    except ValueError:
+        pass
+
+    try:
+        resolved = socket.gethostbyname(hostname)
+        if resolved not in {"0.0.0.0", "127.0.0.1"}:
+            return resolved
+    except OSError:
+        pass
+
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
 
 
 class AP1Security:
@@ -118,7 +145,7 @@ class AirPlayServer:
         self.device_name = device_name
         self.speaker_hardware = speaker_hardware
         self.device_id = self._generate_device_id()
-        self.ipv4 = self._get_ipv4()
+        self.ipv4 = _resolve_advertise_ip(hostname)
 
         # RTSP 服务器
         self.rtsp_port = 0
@@ -171,17 +198,6 @@ class AirPlayServer:
     def device_id_bin(self) -> bytes:
         """获取设备 ID 的二进制格式（6 字节）"""
         return int(self.device_id.replace(":", ""), base=16).to_bytes(6, "big")
-
-    def _get_ipv4(self) -> str:
-        """获取本机 IPv4 地址"""
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            ip = s.getsockname()[0]
-            s.close()
-            return ip
-        except Exception:
-            return "127.0.0.1"
 
     @property
     def ipv4_bin(self) -> bytes:
@@ -347,9 +363,15 @@ class AirPlayServer:
                     apple_challenge = headers.get("Apple-Challenge")
                     if apple_challenge:
                         log.info(f"Apple-Challenge: {apple_challenge}")
+                        request_host = self.ipv4_bin
+                        try:
+                            local_ip = sock.getsockname()[0]
+                            request_host = socket.inet_pton(socket.AF_INET, local_ip)
+                        except OSError:
+                            pass
                         apple_response = AP1Security.compute_apple_response(
                             apple_challenge,
-                            self.ipv4_bin,
+                            request_host,
                             self.device_id_bin,
                         )
                         log.info(f"Apple-Response: {apple_response[:50]}...")

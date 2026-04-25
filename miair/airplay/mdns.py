@@ -5,6 +5,7 @@
 """
 
 import logging
+import ipaddress
 import socket
 import threading
 import time
@@ -13,6 +14,32 @@ from zeroconf import ServiceInfo, Zeroconf, IPVersion
 from zeroconf._exceptions import ServiceNameAlreadyRegistered, NonUniqueNameException
 
 log = logging.getLogger("miair")
+
+
+def _resolve_advertise_ip(hostname: str) -> str:
+    """优先使用配置中的局域网 IP，避免误用 tun/虚拟网卡地址。"""
+    try:
+        ipaddress.ip_address(hostname)
+        if hostname not in {"0.0.0.0", "127.0.0.1"}:
+            return hostname
+    except ValueError:
+        pass
+
+    try:
+        resolved = socket.gethostbyname(hostname)
+        if resolved not in {"0.0.0.0", "127.0.0.1"}:
+            return resolved
+    except OSError:
+        pass
+
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
 
 
 class AirPlayMDNS:
@@ -40,7 +67,7 @@ class AirPlayMDNS:
         """在独立线程中运行 mDNS"""
         try:
             # 获取本机 IP 地址
-            ip = self._get_ip()
+            ip = _resolve_advertise_ip(self.hostname)
             ip_bytes = socket.inet_aton(ip)
 
             log.info(f"AirPlay mDNS 启动中，IP: {ip}:{self.rtsp_port}")
@@ -181,17 +208,6 @@ class AirPlayMDNS:
                 pass
         if self._thread:
             self._thread.join(timeout=2)
-
-    def _get_ip(self) -> str:
-        """获取本机 IP 地址"""
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            ip = s.getsockname()[0]
-            s.close()
-            return ip
-        except Exception:
-            return "127.0.0.1"
 
     def update_port(self, port: int):
         """更新 RTSP 端口（动态分配后调用）"""

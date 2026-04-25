@@ -86,8 +86,23 @@ class PlexSession:
     server_address: str = ""
     server_port: int = 32400
     token: str = ""
+    play_queue_id: str = ""
+    play_queue_version: str = ""
+    play_queue_item_id: str = ""
+    container_key: str = ""
+    controllable: str = "playPause,stop,seekTo,skipPrevious,skipNext"
+    controller_updated_at: float = field(default_factory=time.monotonic)
 
-    def replace_media(self, media: PlexMedia, context: PlexServerContext, command_id: str):
+    def replace_media(
+        self,
+        media: PlexMedia,
+        context: PlexServerContext,
+        command_id: str,
+        play_queue_id: str = "",
+        play_queue_version: str = "",
+        play_queue_item_id: str = "",
+        container_key: str = "",
+    ):
         self.command_id = command_id
         self.session_id = str(uuid.uuid4())
         self.state = "playing"
@@ -101,11 +116,20 @@ class PlexSession:
         self.server_address = context.fetch_address
         self.server_port = context.port
         self.token = context.token
+        self.play_queue_id = play_queue_id
+        self.play_queue_version = play_queue_version
+        self.play_queue_item_id = play_queue_item_id
+        self.container_key = container_key
+        self.controller_updated_at = time.monotonic()
 
     def set_state(self, state: str, position_ms: int | None = None):
         self.position_ms = self.current_position_ms() if position_ms is None else max(0, position_ms)
         self.state = state
         self.updated_at = time.monotonic()
+        self.controller_updated_at = time.monotonic()
+
+    def touch_controller(self):
+        self.controller_updated_at = time.monotonic()
 
     def current_position_ms(self) -> int:
         position = self.position_ms
@@ -135,6 +159,12 @@ class PlexSession:
         self.server_address = ""
         self.server_port = 32400
         self.token = ""
+        self.play_queue_id = ""
+        self.play_queue_version = ""
+        self.play_queue_item_id = ""
+        self.container_key = ""
+        self.controllable = "playPause,stop,seekTo,skipPrevious,skipNext"
+        self.controller_updated_at = time.monotonic()
 
 
 class PlexPlayer:
@@ -153,7 +183,7 @@ class PlexPlayer:
         self.zc_info: ServiceInfo | None = None
         self._session = PlexSession()
         self._tasks: list[asyncio.Task] = []
-        self._gdm_transport = None
+        self._gdm_transports = []
 
     async def start(self):
         self.running = True
@@ -188,9 +218,9 @@ class PlexPlayer:
             await asyncio.gather(*self._tasks, return_exceptions=True)
         self._tasks.clear()
 
-        if self._gdm_transport:
-            self._gdm_transport.close()
-            self._gdm_transport = None
+        for transport in self._gdm_transports:
+            transport.close()
+        self._gdm_transports.clear()
 
         if self.zc:
             try:
@@ -221,6 +251,7 @@ class PlexPlayer:
 
     async def handle_play_media(self, request: web.Request):
         try:
+            log.info(f"Plex playMedia: key={request.query.get('key', '')} target={self.config.get_plex_target_did()}")
             renderer = self._require_target_renderer()
             context = self._parse_server_context(request.query)
             command_id = request.query.get("commandID", self._session.command_id)
@@ -232,7 +263,15 @@ class PlexPlayer:
             if not success:
                 raise PlexError("Target speaker rejected playback")
 
-            self._session.replace_media(media, context, command_id)
+            self._session.replace_media(
+                media,
+                context,
+                command_id,
+                play_queue_id=request.query.get("playQueueID", ""),
+                play_queue_version=request.query.get("playQueueVersion", ""),
+                play_queue_item_id=request.query.get("playQueueItemID", ""),
+                container_key=request.query.get("containerKey", ""),
+            )
             if offset_ms > 0:
                 self._session.set_state("playing", offset_ms)
             await self._sync_session_from_renderer(renderer)
@@ -250,6 +289,7 @@ class PlexPlayer:
         if not action:
             action = request.path.rstrip("/").split("/")[-1]
         self._session.command_id = request.query.get("commandID", self._session.command_id)
+        self._session.touch_controller()
 
         try:
             renderer = self._require_target_renderer(require_media=action not in {"play", "resume"})
@@ -269,7 +309,7 @@ class PlexPlayer:
                 self._session.set_state("playing")
             elif action == "stop":
                 await renderer.stop()
-                self._session.set_state("stopped")
+                self._session.clear()
             elif action == "seekTo":
                 offset_ms = self._parse_offset_ms(request.query)
                 duration_ms = self._session.duration_ms
@@ -281,13 +321,17 @@ class PlexPlayer:
                 self._session.set_state(self._session.state if self._session.state != "stopped" else "paused", offset_ms)
             elif action == "skipNext":
                 await renderer.next_track()
+                if request.query.get("key"):
+                    self._session.key = request.query.get("key", self._session.key)
             elif action == "skipPrevious":
                 await renderer.previous_track()
+            elif action == "setParameters":
+                await self._handle_set_parameters(renderer, request.query)
             else:
-                log.info(f"Plex 收到未实现控制指令: {action}")
+                log.info(f"Plex 收到未实现控制指令: {action} query={dict(request.query)}")
 
             await self._sync_session_from_renderer(renderer)
-            if action in {"pause", "play", "resume", "stop", "seekTo", "skipNext", "skipPrevious"}:
+            if action in {"pause", "play", "resume", "stop", "seekTo", "skipNext", "skipPrevious", "setParameters"}:
                 await self._report_timeline()
             return self._make_response(self._build_poll_xml())
         except PlexError as exc:
@@ -299,6 +343,7 @@ class PlexPlayer:
 
     async def handle_poll(self, request: web.Request):
         self._session.command_id = request.query.get("commandID", self._session.command_id)
+        self._session.touch_controller()
         renderer = self._get_target_renderer()
         if renderer:
             await self._sync_session_from_renderer(renderer)
@@ -323,7 +368,15 @@ class PlexPlayer:
             f'deviceClass="{escape(persona.device_class)}" '
             f'device="{escape(persona.device)}" '
             f'address="{self.local_ip}" '
-            f'port="{self.port}" />'
+            f'port="{self.port}" '
+            'provides="player,pubsub-player" '
+            'publicAddressMatches="1" '
+            'owned="1" '
+            'relayed="0" '
+            'httpsRequired="0">'
+            f'<Connection protocol="http" address="{self.local_ip}" port="{self.port}" '
+            f'uri="http://{self.local_ip}:{self.port}" local="1" relay="0" secure="0" />'
+            "</Player>"
             "</MediaContainer>"
         )
         return self._make_response(content)
@@ -478,12 +531,21 @@ class PlexPlayer:
         position_ms = int(renderer._get_elapsed_time() * 1000)
         if renderer._track_duration > 0:
             self._session.duration_ms = int(renderer._track_duration * 1000)
+        if new_state == "stopped":
+            self._session.position_ms = position_ms
+            self._session.state = new_state
+            self._session.updated_at = time.monotonic()
+            return
         self._session.set_state(new_state, position_ms)
 
     async def _report_timeline_loop(self):
         try:
             while self.running:
                 await asyncio.sleep(10)
+                if self._session.has_media() and (
+                    time.monotonic() - self._session.controller_updated_at > 30
+                ):
+                    await self._handle_stale_session()
                 if not self._session.has_media() or self._session.state != "playing":
                     continue
                 renderer = self._get_target_renderer()
@@ -492,6 +554,13 @@ class PlexPlayer:
                 await self._report_timeline()
         except asyncio.CancelledError:
             pass
+
+    async def _handle_stale_session(self):
+        renderer = self._get_target_renderer()
+        if renderer and renderer.transport_state in {TRANSPORT_STATE_PLAYING, TRANSPORT_STATE_PAUSED}:
+            log.info("Plex 控制端超时，自动停止当前播放")
+            await renderer.stop()
+        self._session.clear()
 
     async def _report_timeline(self):
         session = self._session
@@ -509,6 +578,14 @@ class PlexPlayer:
             "time": str(session.current_position_ms()),
             "duration": str(session.duration_ms),
         }
+        if session.play_queue_id:
+            params["playQueueID"] = session.play_queue_id
+        if session.play_queue_version:
+            params["playQueueVersion"] = session.play_queue_version
+        if session.play_queue_item_id:
+            params["playQueueItemID"] = session.play_queue_item_id
+        if session.container_key:
+            params["containerKey"] = session.container_key
         request_kwargs = {"headers": headers, "params": params}
         if session.server_protocol == "https":
             request_kwargs["ssl"] = False
@@ -528,7 +605,16 @@ class PlexPlayer:
         key = escape(session.key)
         rating_key = escape(session.rating_key)
         title = escape(session.title)
-        controllable = escape("playPause,stop,seekTo,skipPrevious,skipNext")
+        controllable = escape(session.controllable)
+        play_queue_attrs = ""
+        if session.play_queue_id:
+            play_queue_attrs += f' playQueueID="{escape(session.play_queue_id)}"'
+        if session.play_queue_version:
+            play_queue_attrs += f' playQueueVersion="{escape(session.play_queue_version)}"'
+        if session.play_queue_item_id:
+            play_queue_attrs += f' playQueueItemID="{escape(session.play_queue_item_id)}"'
+        if session.container_key:
+            play_queue_attrs += f' containerKey="{escape(session.container_key)}"'
         return (
             '<?xml version="1.0" encoding="UTF-8"?>'
             f'<MediaContainer size="3" commandID="{escape(self._session.command_id)}" '
@@ -536,11 +622,22 @@ class PlexPlayer:
             f'<Timeline type="music" state="{music_state}" time="{music_time}" '
             f'duration="{music_duration}" key="{key}" ratingKey="{rating_key}" '
             f'title="{title}" machineIdentifier="{self.uuid}" protocol="plex" '
-            f'controllable="{controllable}" volume="100" />'
+            f'controllable="{controllable}" volume="100"{play_queue_attrs} />'
             '<Timeline type="video" state="stopped" time="0" duration="0" />'
             '<Timeline type="photo" state="stopped" time="0" duration="0" />'
             "</MediaContainer>"
         )
+
+    async def _handle_set_parameters(self, renderer, query):
+        volume = query.get("volume")
+        if volume not in (None, ""):
+            try:
+                await renderer.set_volume(int(float(volume)))
+            except ValueError:
+                log.debug(f"忽略无效 Plex 音量参数: {volume}")
+
+        if query.get("shuffle") is not None or query.get("repeat") is not None:
+            log.info(f"Plex setParameters: {dict(query)}")
 
     def _make_response(self, content: str, content_type: str = "text/xml") -> web.Response:
         return web.Response(
@@ -552,6 +649,7 @@ class PlexPlayer:
                 "X-Plex-Client-Identifier": self.uuid,
                 "Plex-Client-Identifier": self.uuid,
                 "X-Plex-Session-Identifier": self._session.session_id,
+                "X-Plex-Protocol": "1.0",
             },
         )
 
@@ -595,7 +693,7 @@ class PlexPlayer:
 
         class GDMSProtocol(asyncio.DatagramProtocol):
             def connection_made(self, transport):
-                player._gdm_transport = transport
+                player._gdm_transports.append(transport)
 
             def datagram_received(self, data, addr):
                 if b"PLAYER" not in data and b"M-SEARCH" not in data and b"HELLO" not in data:
@@ -605,21 +703,25 @@ class PlexPlayer:
                     player._gdm_transport.sendto(response, addr)
 
         loop = asyncio.get_running_loop()
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sockets = []
         try:
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-        except OSError:
-            pass
-        sock.bind(("0.0.0.0", 32412))
-        try:
-            await loop.create_datagram_endpoint(lambda: GDMSProtocol(), sock=sock)
+            for port in (32412, 32414):
+                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                try:
+                    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+                except OSError:
+                    pass
+                sock.bind(("0.0.0.0", port))
+                sockets.append(sock)
+                await loop.create_datagram_endpoint(lambda: GDMSProtocol(), sock=sock)
             while self.running:
                 await asyncio.sleep(3600)
         except asyncio.CancelledError:
             pass
         finally:
-            sock.close()
+            for sock in sockets:
+                sock.close()
 
     def _build_gdm_payload(self, hello: bool) -> bytes:
         status = "HELLO * HTTP/1.0" if hello else "HTTP/1.0 200 OK"
@@ -628,12 +730,14 @@ class PlexPlayer:
         payload = (
             f"{status}\r\n"
             f"Name: {display_name}\r\n"
+            f"Host: {self.local_ip}\r\n"
             f"Port: {self.port}\r\n"
             f"Location: http://{self.local_ip}:{self.port}\r\n"
             f"Resource-Identifier: {self.uuid}\r\n"
             "Content-Type: plex/media-player\r\n"
             f"Product: {persona.product}\r\n"
             f"Version: {persona.version}\r\n"
+            f"Updated-At: {int(time.time())}\r\n"
             "Protocol: plex\r\n"
             "Protocol-Version: 1\r\n"
             "Protocol-Capabilities: playback,timeline,navigation,playqueues,music\r\n"
@@ -665,13 +769,20 @@ class PlexPlayer:
 
     def _build_mdns_properties(self) -> dict[str, str]:
         persona = self.persona
+        display_name = self.config.plex_name or "miPlay"
         return {
             "machineIdentifier": self.uuid,
+            "name": display_name,
             "product": persona.product,
             "version": persona.version,
             "platform": persona.platform,
             "device": persona.device,
             "deviceClass": persona.device_class,
+            "protocol": "plex",
+            "protocolVersion": "1",
+            "protocolCapabilities": "playback,timeline,navigation,playqueues,music",
+            "resourceIdentifier": self.uuid,
+            "port": str(self.port),
         }
 
     @staticmethod
