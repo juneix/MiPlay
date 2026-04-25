@@ -34,7 +34,7 @@ class MiAir:
         self._web_runner: web.AppRunner | None = None
         self.dlna_running = False
         self.airplay_manager: AirPlayManager | None = None
-        self.plex_players: list[PlexPlayer] = []
+        self.plex_player: PlexPlayer | None = None
 
     def get_renderer_by_did(self, did: str) -> DLNARenderer | None:
         """根据 DID 获取渲染器"""
@@ -72,8 +72,9 @@ class MiAir:
         await web_site.start()
         log.info(f"Web 管理界面: http://{self.config.hostname}:{self.config.web_port}")
         
-        # 1.1 如果已有配置，尝试提前启动 Plex (或者在 _start_dlna_services 中按需启动)
-        # 这里为了保持简洁，我们统一在 _start_dlna_services 中处理多个音箱的 Plex 实例
+        # 1.1 启动 Plex 模拟播放器 (始终启动)
+        self.plex_player = PlexPlayer(self)
+        await self.plex_player.start()
 
         # 2. 如果已有账号和设备配置，启动 DLNA 和 AirPlay 服务
         if (self.config.account or self.config.cookie) and self.config.mi_did:
@@ -123,9 +124,6 @@ class MiAir:
             self.dlna_running = True
             self.config.save()
 
-            # 1.2 启动 Plex 模拟播放器 - 每个音箱一个
-            await self._start_plex_for_speakers()
-
             # 启动 AirPlay 服务 - 每个音箱一个
             await self._start_airplay_for_speakers()
 
@@ -146,26 +144,6 @@ class MiAir:
             await self.airplay_manager.start_for_speakers(self.speaker_manager.controllers)
         except Exception as e:
             log.error(f"启动 AirPlay 服务失败: {e}")
-
-    async def _start_plex_for_speakers(self):
-        """为每个音箱启动独立的 Plex 模拟服务"""
-        try:
-            if not self.speaker_manager.controllers:
-                return
-
-            # 清理旧实例
-            for p in self.plex_players:
-                await p.stop()
-            self.plex_players.clear()
-
-            base_port = self.config.plex_port
-            for i, controller in enumerate(self.speaker_manager.controllers.values()):
-                port = base_port + i
-                player = PlexPlayer(self, controller=controller, port=port)
-                await player.start()
-                self.plex_players.append(player)
-        except Exception as e:
-            log.error(f"启动 Plex 模拟服务失败: {e}")
 
     async def restart_dlna_services(self):
         """重启 DLNA 服务 (用户通过 Web 修改配置后调用)"""
@@ -189,11 +167,6 @@ class MiAir:
             self.device_server = None
         self.renderers.clear()
         self._did_to_udn.clear()
-        
-        for p in self.plex_players:
-            await p.stop()
-        self.plex_players.clear()
-        
         self.dlna_running = False
 
     async def stop(self):
@@ -204,9 +177,9 @@ class MiAir:
         if self.airplay_manager:
             await self.airplay_manager.stop()
             self.airplay_manager = None
-        for p in self.plex_players:
-            await p.stop()
-        self.plex_players.clear()
+        if self.plex_player:
+            await self.plex_player.stop()
+            self.plex_player = None
         if self._web_runner:
             # 添加超时，避免卡住
             try:
