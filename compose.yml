@@ -1,6 +1,7 @@
 services:
   miplay:
     image: ghcr.io/juneix/miplay
+    # image: docker.1ms.run/juneix/miplay  # 毫秒镜像加速
     container_name: miplay
     network_mode: host
     restart: unless-stopped
