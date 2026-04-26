@@ -45,8 +45,9 @@ services:
 
 ### 2、飞牛应用
 
-飞牛商店的【AirPlay - 隔空播放】即将整合 MiPlay。
+飞牛商店的【AirPlay 2 - 隔空播放】即将整合 MiPlay。
 
+![miplay-3.webp](./miplay-3.webp)
 
 ## ❤️ 支持项目
 
