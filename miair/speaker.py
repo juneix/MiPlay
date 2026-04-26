@@ -47,6 +47,25 @@ class SpeakerController:
             return ret is not None
         except Exception as e:
             log.error(f"play_url 失败: {e}")
+            # 检查是否是登录失败的错误
+            if "Login failed" in str(e) or "登录验证失败" in str(e):
+                log.info("检测到登录失败，尝试重新登录...")
+                # 重置登录状态并重新登录
+                self.auth._logged_in = False
+                await self.auth.login()
+                # 重新尝试播放
+                try:
+                    await self.auth.ensure_login()
+                    if self._should_use_music_api():
+                        ret = await self.auth.mina_service.play_by_music_url(
+                            self.device_id, url, audio_id=DEFAULT_AUDIO_ID
+                        )
+                    else:
+                        ret = await self.auth.mina_service.play_by_url(self.device_id, url)
+                    return ret is not None
+                except Exception as e2:
+                    log.error(f"重新登录后 play_url 仍然失败: {e2}")
+                    return False
             return False
 
     async def pause(self) -> bool:
@@ -58,6 +77,20 @@ class SpeakerController:
             return True
         except Exception as e:
             log.error(f"pause 失败: {e}")
+            # 检查是否是登录失败的错误
+            if "Login failed" in str(e) or "登录验证失败" in str(e):
+                log.info("检测到登录失败，尝试重新登录...")
+                # 重置登录状态并重新登录
+                self.auth._logged_in = False
+                await self.auth.login()
+                # 重新尝试暂停
+                try:
+                    await self.auth.ensure_login()
+                    await self.auth.mina_service.player_pause(self.device_id)
+                    return True
+                except Exception as e2:
+                    log.error(f"重新登录后 pause 仍然失败: {e2}")
+                    return False
             return False
 
     async def stop(self) -> bool:
@@ -72,6 +105,21 @@ class SpeakerController:
             return True
         except Exception as e:
             log.error(f"stop 失败: {e}")
+            # 检查是否是登录失败的错误
+            if "Login failed" in str(e) or "登录验证失败" in str(e):
+                log.info("检测到登录失败，尝试重新登录...")
+                # 重置登录状态并重新登录
+                self.auth._logged_in = False
+                await self.auth.login()
+                # 重新尝试停止
+                try:
+                    await self.auth.ensure_login()
+                    await self.auth.mina_service.player_stop(self.device_id)
+                    await self.pause()
+                    return True
+                except Exception as e2:
+                    log.error(f"重新登录后 stop 仍然失败: {e2}")
+                    return False
             return False
 
     async def set_volume(self, volume: int) -> bool:
@@ -86,6 +134,22 @@ class SpeakerController:
             return True
         except Exception as e:
             log.error(f"set_volume 失败: {e}")
+            # 检查是否是登录失败的错误
+            if "Login failed" in str(e) or "登录验证失败" in str(e):
+                log.info("检测到登录失败，尝试重新登录...")
+                # 重置登录状态并重新登录
+                self.auth._logged_in = False
+                await self.auth.login()
+                # 重新尝试设置音量
+                try:
+                    await self.auth.ensure_login()
+                    await self.auth.mina_service.player_set_volume(self.device_id, volume)
+                    if volume > 0:
+                        self._last_volume = volume
+                    return True
+                except Exception as e2:
+                    log.error(f"重新登录后 set_volume 仍然失败: {e2}")
+                    return False
             return False
 
     async def get_volume(self) -> int:
@@ -100,6 +164,24 @@ class SpeakerController:
             return volume
         except Exception as e:
             log.error(f"get_volume 失败: {e}")
+            # 检查是否是登录失败的错误
+            if "Login failed" in str(e) or "登录验证失败" in str(e):
+                log.info("检测到登录失败，尝试重新登录...")
+                # 重置登录状态并重新登录
+                self.auth._logged_in = False
+                await self.auth.login()
+                # 重新尝试获取音量
+                try:
+                    await self.auth.ensure_login()
+                    status = await self.auth.mina_service.player_get_status(self.device_id)
+                    info = json.loads(status.get("data", {}).get("info", "{}"))
+                    volume = int(info.get("volume", 0))
+                    if volume > 0:
+                        self._last_volume = volume
+                    return volume
+                except Exception as e2:
+                    log.error(f"重新登录后 get_volume 仍然失败: {e2}")
+                    return self._last_volume
             return self._last_volume
 
     async def get_status(self) -> dict:
@@ -132,6 +214,31 @@ class SpeakerController:
                 "volume": int(info.get("volume", 0)),
             }
         except Exception as e:
+            # 检查是否是登录失败的错误
+            if "Login failed" in str(e) or "登录验证失败" in str(e):
+                log.info("检测到登录失败，尝试重新登录...")
+                # 重置登录状态并重新登录
+                self.auth._logged_in = False
+                await self.auth.login()
+                # 重新尝试获取状态
+                try:
+                    await self.auth.ensure_login()
+                    playing_info = await self.auth.mina_service.player_get_status(
+                        self.device_id
+                    )
+                    if playing_info.get("code") != 0:
+                        raise Exception(f"Mina API Error: {playing_info}")
+                    data = playing_info.get("data", {})
+                    info_str = data.get("info")
+                    if not info_str:
+                        raise Exception(f"Mina API response missing 'info': {playing_info}")
+                    info = json.loads(info_str)
+                    return {
+                        "status": info.get("status", 0),
+                        "volume": int(info.get("volume", 0)),
+                    }
+                except Exception as e2:
+                    log.error(f"重新登录后 get_status 仍然失败: {e2}")
             # 向上抛出异常，让调用者（如 DeviceServer 的轮询任务）捕获并忽略本次轮询
             raise Exception(f"get_status 失败: {e}")
 

@@ -86,10 +86,34 @@ class MiAir:
             # 登录小米
             await self.auth.login()
 
+            # 检查登录状态
+            if not self.auth.is_logged_in():
+                log.warning("登录失败，无法启动 DLNA 服务")
+                # 清空渲染器和控制器，避免显示旧设备
+                self.renderers.clear()
+                self._did_to_udn.clear()
+                if hasattr(self, 'speaker_manager'):
+                    self.speaker_manager.controllers.clear()
+                return
+
+            # 获取设备列表，确保能正常获取新账号的设备
+            device_list = await self.auth.get_device_list()
+            if not device_list:
+                log.warning("未获取到设备列表，无法启动 DLNA 服务")
+                # 清空渲染器和控制器，避免显示旧设备
+                self.renderers.clear()
+                self._did_to_udn.clear()
+                if hasattr(self, 'speaker_manager'):
+                    self.speaker_manager.controllers.clear()
+                return
+
             # 初始化音箱
             await self.speaker_manager.init_speakers()
             if not self.speaker_manager.controllers:
                 log.warning("没有可用的音箱，请检查配置或重新选择设备")
+                # 清空渲染器和控制器，避免显示旧设备
+                self.renderers.clear()
+                self._did_to_udn.clear()
                 return
 
             # 为每个音箱创建 DLNA 渲染器
@@ -126,6 +150,13 @@ class MiAir:
 
         except Exception as e:
             log.error(f"启动 DLNA 服务失败: {e}")
+            # 确保 dlna_running 为 False
+            self.dlna_running = False
+            # 清空渲染器和控制器，避免显示旧设备
+            self.renderers.clear()
+            self._did_to_udn.clear()
+            if hasattr(self, 'speaker_manager'):
+                self.speaker_manager.controllers.clear()
 
     async def _start_airplay_for_speakers(self):
         """为每个音箱启动独立的 AirPlay 接收服务"""
@@ -143,6 +174,9 @@ class MiAir:
         """重启 DLNA 服务 (用户通过 Web 修改配置后调用)"""
         # 先停止现有服务
         await self._stop_dlna_services()
+        # 关闭并重新初始化 auth，确保账号切换生效
+        await self.auth.close()
+        self.auth = AuthManager(self.config)
         # 重建 speaker manager
         self.speaker_manager = SpeakerManager(self.config, self.auth)
         # 启动

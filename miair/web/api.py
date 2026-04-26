@@ -14,10 +14,25 @@ from miair.config import Config
 log = logging.getLogger("miair")
 
 
+def _is_docker():
+    """检测是否在 Docker 容器中运行"""
+    try:
+        with open('/proc/1/cgroup', 'r') as f:
+            return 'docker' in f.read()
+    except:
+        return False
+
 def _restart_process():
     """重启当前 Python 进程"""
     log.info(f"重启进程: {sys.executable} {sys.argv}")
-    if sys.platform == "win32":
+    
+    # 检测是否在 Docker 容器中
+    if _is_docker():
+        # Docker 环境下，直接退出进程，让 Docker 容器重启
+        log.info("在 Docker 环境中，退出进程以触发容器重启")
+        import os
+        os._exit(1)
+    elif sys.platform == "win32":
         # Windows 上 os.execv 行为不同，使用 subprocess 重启
         import subprocess
         subprocess.Popen([sys.executable] + sys.argv)
@@ -99,6 +114,12 @@ def create_web_app(config: Config, app_instance) -> web.Application:
         # 更新其他配置
         if "auto_play_on_set_uri" in data:
             config.auto_play_on_set_uri = data["auto_play_on_set_uri"]
+
+        # 更新端口配置
+        if "dlna_port" in data:
+            config.dlna_port = data["dlna_port"]
+        if "web_port" in data:
+            config.web_port = data["web_port"]
 
         # 更新实验性功能配置
         if "auto_resume_on_interrupt" in data:

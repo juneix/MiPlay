@@ -80,6 +80,9 @@ class AuthManager:
                 self.config.password,
                 token_store=token_store,
             )
+            # 确保 token 不为 None，避免后续操作出错
+            if not hasattr(self.account, 'token') or self.account.token is None:
+                self.account.token = {"deviceId": "miair_device"}
 
         # 显式调用 login
         # 如果使用 cookie 登录，跳过 login 调用，直接标记为已登录
@@ -93,6 +96,9 @@ class AuthManager:
                 log.info("小米账号登录成功")
             except Exception as e:
                 self._logged_in = False
+                # 确保 token 不为 None，避免后续操作出错
+                if not hasattr(self.account, 'token') or self.account.token is None:
+                    self.account.token = {"deviceId": "miair_device"}
                 err_msg = str(e)
                 err_code = self._extract_error_code(err_msg)
                 if err_code == "87001" or "captcha" in err_msg.lower():
@@ -123,7 +129,7 @@ class AuthManager:
 
     async def ensure_login(self):
         """确保已登录，未登录则尝试登录"""
-        if self.mina_service is None:
+        if self.mina_service is None or not self._logged_in:
             await self.login()
 
     @staticmethod

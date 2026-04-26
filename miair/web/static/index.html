@@ -230,6 +230,10 @@
         .delay-label { font-size: 13px; color: var(--text-secondary); }
         .delay-unit { font-size: 13px; color: var(--text-muted); }
 
+        /* Section styles */
+        .section { margin-bottom: 20px; padding: 16px; background-color: var(--card-bg); border-radius: 8px; border: 1px solid var(--border); }
+        .section-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+
         /* Footer */
         .footer { text-align: center; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
         .footer-text { font-size: 11px; color: var(--text-muted); }
@@ -264,7 +268,7 @@
                     <input type="password" class="form-input" id="input-passToken" placeholder="从浏览器 Cookie 中提取 passToken 的值">
                 </div>
                 <p class="tip">
-                    登录 <code>account.xiaomi.com</code> → F12 开发者工具 → Application → Cookies → 复制 <code>userId</code> 和 <code>passToken</code>
+                    登录 <code>account.xiaomi.com</code> → F12 开发者工具 → 应用程序（Application） → Cookies → 复制 <code>userId</code> 和 <code>passToken</code>
                 </p>
                 <div class="btn-row">
                     <button class="btn btn-primary" id="btn-fetch-devices">登录小米账号</button>
@@ -276,20 +280,34 @@
                 <div class="card-header">
                     <span class="card-title">实验性功能</span>
                 </div>
-                <div class="toggle-row">
-                    <div>
-                        <div class="toggle-label">打断后续播</div>
-                        <div class="toggle-desc">被语音唤醒打断后自动恢复播放</div>
+                <div class="section">
+                    <div class="section-title">打断后续播</div>
+                    <div class="toggle-row">
+                        <div>
+                            <div class="toggle-label">打断后续播</div>
+                            <div class="toggle-desc">被语音唤醒打断后自动恢复播放</div>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="chk-auto-resume">
+                            <span class="toggle-slider"></span>
+                        </label>
                     </div>
-                    <label class="toggle">
-                        <input type="checkbox" id="chk-auto-resume">
-                        <span class="toggle-slider"></span>
-                    </label>
+                    <div class="delay-row">
+                        <span class="delay-label">恢复延迟</span>
+                        <input type="number" class="input-number" id="input-resume-delay" value="5" min="1" max="300">
+                        <span class="delay-unit">秒</span>
+                    </div>
                 </div>
-                <div class="delay-row">
-                    <span class="delay-label">恢复延迟</span>
-                    <input type="number" class="input-number" id="input-resume-delay" value="5" min="1" max="300">
-                    <span class="delay-unit">秒</span>
+                <div class="section">
+                    <div class="section-title">端口设置</div>
+                    <div class="form-group">
+                        <label for="input-dlna-port">DLNA 端口</label>
+                        <input type="number" class="form-input" id="input-dlna-port" placeholder="8200" min="1" max="65535">
+                    </div>
+                    <div class="form-group">
+                        <label for="input-web-port">Web 管理端口</label>
+                        <input type="number" class="form-input" id="input-web-port" placeholder="8300" min="1" max="65535">
+                    </div>
                 </div>
                 <div class="btn-row">
                     <button class="btn btn-primary" id="btn-save-experimental">保存并重新启动</button>
@@ -326,7 +344,7 @@
     </div>
 
     <div class="footer">
-        <div class="footer-text">MiAir v0.1.3-alpha</div>
+        <div class="footer-text">MiAir v0.2.1-alpha</div>
     </div>
 </div>
 
@@ -350,7 +368,7 @@ async function fetchSetting(withDeviceList) {
         currentSetting = data;
         updateStatusBar(data);
 
-        // 仅首次加载时填充账号和实验性设置，避免覆盖用户正在编辑的内容
+        // 仅首次加载时填充账号、端口和实验性设置，避免覆盖用户正在编辑的内容
         if (!_initialLoaded) {
             _initialLoaded = true;
             if (data.cookie) {
@@ -359,13 +377,16 @@ async function fetchSetting(withDeviceList) {
                 if (userIdMatch) document.getElementById('input-userId').value = userIdMatch[1];
                 if (passTokenMatch) document.getElementById('input-passToken').value = passTokenMatch[1];
             }
+            // 加载端口设置
+            if (data.dlna_port) document.getElementById('input-dlna-port').value = data.dlna_port;
+            if (data.web_port) document.getElementById('input-web-port').value = data.web_port;
             loadExperimentalSettings();
         }
 
         if (data.device_list && data.device_list.length > 0) {
             renderDeviceList(data.device_list, data.mi_did || '');
         } else if (data.has_account && withDeviceList) {
-            document.getElementById('device-list').innerHTML = '<div class="loading">未发现设备，请检查账号是否正确</div>';
+            document.getElementById('device-list').innerHTML = '<div class="loading">未发现设备，请检查账号密码是否正确</div>';
         }
 
         if (data.dlna_running) await fetchRenderers();
@@ -382,7 +403,7 @@ function updateStatusBar(data) {
     if (data.dlna_running) {
         bar.className = 'status-bar status-running';
         dot.className = 'status-dot dot-green';
-        text.textContent = '服务运行中 · ' + data.renderers_count + ' 个渲染器 · ' + data.hostname + ':' + data.dlna_port;
+        text.textContent = '服务运行中 · 共 ' + data.renderers_count + ' 个渲染器正在工作';
     } else if (data.has_account && data.mi_did) {
         bar.className = 'status-bar status-stopped';
         dot.className = 'status-dot dot-yellow';
@@ -498,23 +519,16 @@ document.getElementById('btn-fetch-devices').addEventListener('click', async fun
             body: JSON.stringify({ cookie }),
         });
 
-        const resp = await fetch('/api/devices');
-        const data = await resp.json();
-
-        if (data.error) {
-            tip.textContent = data.error;
-            tip.className = 'tip error';
-        } else if (data.devices && data.devices.length > 0) {
-            tip.textContent = '登录成功，发现 ' + data.devices.length + ' 个设备';
-            tip.className = 'tip success';
-            renderDeviceList(data.devices, currentSetting.mi_did || '');
-        } else {
-            tip.textContent = '未发现可用设备，请检查账号是否正确';
-            tip.className = 'tip error';
-        }
+        // 保存 cookie 后服务器会重启，等待后刷新页面
+        tip.textContent = '正在登录...';
+        tip.className = 'tip success';
+        // 等待服务重启
+        setTimeout(() => location.reload(), 4000);
     } catch (e) {
-        tip.textContent = '请求失败: ' + e.message;
-        tip.className = 'tip error';
+        // 进程重启导致连接断开是正常的，或者登录失败
+        tip.textContent = '正在重启服务...';
+        tip.className = 'tip success';
+        setTimeout(() => location.reload(), 4000);
     } finally {
         btn.disabled = false;
         btn.textContent = '登录并获取设备';
@@ -670,8 +684,17 @@ function startAutoRefresh() {
 document.getElementById('btn-save-experimental').addEventListener('click', async function() {
     const autoResume = document.getElementById('chk-auto-resume').checked;
     const resumeDelay = parseInt(document.getElementById('input-resume-delay').value) || 5;
+    const dlnaPort = parseInt(document.getElementById('input-dlna-port').value) || 8200;
+    const webPort = parseInt(document.getElementById('input-web-port').value) || 8300;
     const tip = document.getElementById('tip-experimental');
     const btn = this;
+
+    // 端口验证
+    if (dlnaPort < 1 || dlnaPort > 65535 || webPort < 1 || webPort > 65535) {
+        tip.textContent = '端口必须在 1-65535 之间';
+        tip.className = 'tip error';
+        return;
+    }
 
     btn.disabled = true;
     btn.textContent = '保存中...';
@@ -684,6 +707,8 @@ document.getElementById('btn-save-experimental').addEventListener('click', async
             body: JSON.stringify({
                 auto_resume_on_interrupt: autoResume,
                 resume_delay_seconds: resumeDelay,
+                dlna_port: dlnaPort,
+                web_port: webPort,
             }),
         });
         const data = await resp.json();
@@ -693,6 +718,8 @@ document.getElementById('btn-save-experimental').addEventListener('click', async
             tip.className = 'tip success';
             currentSetting.auto_resume_on_interrupt = autoResume;
             currentSetting.resume_delay_seconds = resumeDelay;
+            currentSetting.dlna_port = dlnaPort;
+            currentSetting.web_port = webPort;
         } else {
             tip.textContent = data.message || '保存失败';
             tip.className = 'tip error';
