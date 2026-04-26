@@ -12,12 +12,13 @@ from miplay.config import Config
 
 
 def _restart_process():
+    args = [sys.executable, "-m", "miplay.cli", *sys.argv[1:]]
     if sys.platform == "win32":
         import subprocess
 
-        subprocess.Popen([sys.executable] + sys.argv)
+        subprocess.Popen(args)
         os._exit(0)
-    os.execv(sys.executable, [sys.executable] + sys.argv)
+    os.execv(sys.executable, args)
 
 
 def create_web_app(config: Config, app_instance) -> web.Application:

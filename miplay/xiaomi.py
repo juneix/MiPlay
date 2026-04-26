@@ -62,6 +62,23 @@ class XiaomiAuthManager:
     def token_store(self) -> str:
         return os.path.join(self.config.conf_path, ".mi.token")
 
+    @staticmethod
+    def _has_basic_token(account: MiAccount | None) -> bool:
+        token = getattr(account, "token", None) or {}
+        return bool(token.get("userId") and token.get("passToken"))
+
+    def _describe_login_failure(self, exc: Exception | None = None) -> str:
+        text = str(exc or "")
+        code = self.extract_error_code(text)
+        lowered = text.lower()
+        if code == "87001" or "captcha" in lowered:
+            return "Xiaomi login requires captcha verification; account/password is not supported in this state. Please use fresh cookies instead."
+        if code == "70016":
+            return "Xiaomi login verification failed. Please use fresh cookies instead of account/password."
+        if "userid" in lowered:
+            return "Xiaomi account requires additional security verification. Please use fresh cookies instead."
+        return "Account/password login failed or requires Xiaomi security verification. Please use fresh cookies instead."
+
     async def login(self):
         async with self._login_lock:
             if (
@@ -89,12 +106,19 @@ class XiaomiAuthManager:
                     "userId": token_data["userId"],
                     "passToken": token_data["passToken"],
                     "deviceId": "miplay_device",
-                    "ssecurity": "",
-                    "serviceToken": "",
                 }
                 self._cookie_loaded = True
-                self._logged_in = False
-                log.info("Loaded Xiaomi cookie credentials; waiting for API validation")
+                try:
+                    await self.account.login("micoapi")
+                    self._logged_in = self._has_basic_token(self.account)
+                    if not self._logged_in:
+                        raise DeviceListError("Cookie login failed: Xiaomi token is incomplete after login")
+                    log.info("Xiaomi cookie login succeeded")
+                except Exception as exc:
+                    self._logged_in = False
+                    raise DeviceListError(
+                        f"Cookie login failed: {exc}"
+                    ) from exc
             else:
                 self._cookie_loaded = False
                 self.account = MiAccount(
@@ -105,11 +129,13 @@ class XiaomiAuthManager:
                 )
                 try:
                     await self.account.login("micoapi")
-                    self._logged_in = True
-                    log.info("Xiaomi account login succeeded")
                 except Exception as exc:
-                    self._logged_in = False
                     log.error(f"Xiaomi login failed: {exc}")
+                    raise DeviceListError(self._describe_login_failure(exc)) from exc
+                self._logged_in = self._has_basic_token(self.account)
+                if not self._logged_in:
+                    raise DeviceListError(self._describe_login_failure())
+                log.info("Xiaomi account login succeeded")
 
             self.mina_service = MiNAService(self.account)
             self.miio_service = MiIOService(self.account)
