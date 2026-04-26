@@ -6,7 +6,6 @@ services:
     restart: unless-stopped
     environment:
       WEB_PORT: 8300
-      MIPLAY_HOST: ${MIPLAY_HOST:-}
     volumes:
       - ./conf:/app/conf
 # 如需搭配 Shairport-Sync 使用，请取消注释
