@@ -187,14 +187,17 @@ class AirPlayServer:
         self._loop: asyncio.AbstractEventLoop | None = None  # 事件循环引用（用于跨线程回调）
 
     def _generate_device_id(self) -> str:
-        """生成设备 MAC 地址格式的 ID
+        """生成设备 MAC 地址格式的 ID，支持加盐避让
 
-        基于设备名生成唯一 ID，确保每个音箱有不同的 ID。
+        使用 02 前缀标识为本地管理的虚拟 MAC，确保不与真实硬件冲突。
         """
-        # 使用设备名的 hash 来生成伪 MAC 地址，确保每个设备名对应唯一的 ID
         import hashlib
-        h = hashlib.md5(self.device_name.encode()).hexdigest()[:12]
-        return ":".join(f"{h[i:i+2].upper()}" for i in range(0, 12, 2))
+        import os
+        # 默认盐值确保与普通 AirPlay 设备区分开，也允许环境变量覆盖
+        salt = os.environ.get("MIPLAY_ID_SALT", "miplay_salt")
+        h = hashlib.md5((self.device_name + salt).encode()).hexdigest()[:10]
+        # 强制使用 02 前缀（Locally Administered）
+        return f"02:{':'.join(f'{h[i:i+2].upper()}' for i in range(0, 10, 2))}"
 
     @property
     def device_id_bin(self) -> bytes:
