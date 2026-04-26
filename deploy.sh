@@ -125,6 +125,14 @@ get_lan_ip() {
 }
 
 HOST_IP=$(get_lan_ip)
+if [ "$HOST_IP" = "127.0.0.1" ]; then
+    echo -e "${YELLOW}无法自动检测到有效的局域网 IP，请手动输入：${NC}"
+    read -p "请输入宿主机 IP 地址: " HOST_IP
+    while [ -z "$HOST_IP" ]; do
+        echo -e "${RED}IP 地址不能为空，请重新输入${NC}"
+        read -p "请输入宿主机 IP 地址: " HOST_IP
+    done
+fi
 echo -e "${GREEN}✓ 宿主机 IP: $HOST_IP${NC}"
 
 # ============================================
@@ -257,9 +265,21 @@ read -p "请选择 (1/2): " KEEP_CONFIG
 docker rm -f "$CONTAINER_NAME" 2>/dev/null || true
 
 # 根据用户选择处理配置
-if [ "$KEEP_CONFIG" != "1" ]; then
+if [ "$KEEP_CONFIG" = "1" ]; then
+    # 备份配置
+    echo -e "${GREEN}保留配置，备份现有配置...${NC}"
+    TEMP_CONF="/tmp/miair_conf_backup_$$"
+    if [ -d "$APP_DIR/conf" ] && [ -n "$(ls -A "$APP_DIR/conf" 2>/dev/null)" ]; then
+        cp -r "$APP_DIR/conf" "$TEMP_CONF"
+        echo -e "${GREEN}✓ 配置已备份${NC}"
+    else
+        TEMP_CONF=""
+        echo -e "${YELLOW}未找到现有配置，将使用默认配置${NC}"
+    fi
+else
     echo -e "${YELLOW}重置配置文件...${NC}"
     rm -rf "$APP_DIR/conf" 2>/dev/null || true
+    TEMP_CONF=""
 fi
 
 # 确保配置目录存在
@@ -295,6 +315,15 @@ if [ $? -eq 0 ]; then
     echo -e "${GREEN}  🎉 MiAir 部署成功！${NC}"
     echo "=========================================="
     echo ""
+
+    # 恢复备份的配置
+    if [ -n "$TEMP_CONF" ] && [ -d "$TEMP_CONF" ]; then
+        echo -e "${GREEN}恢复配置...${NC}"
+        cp -r "$TEMP_CONF"/* "$APP_DIR/conf/" 2>/dev/null || true
+        rm -rf "$TEMP_CONF"
+        echo -e "${GREEN}✓ 配置已恢复${NC}"
+    fi
+
     echo -e "Web 管理界面: ${GREEN}YourHostIP:8300${NC}"
     echo -e "DLNA 端口: ${GREEN}8200${NC}"
     echo ""
