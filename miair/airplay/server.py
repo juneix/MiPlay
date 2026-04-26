@@ -174,6 +174,10 @@ class AirPlayServer:
 
     def _get_ipv4(self) -> str:
         """获取本机 IPv4 地址"""
+        hostname = os.getenv("MIAIR_HOSTNAME", "")
+        if hostname and hostname != "127.0.0.1":
+            return hostname
+        
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.connect(("8.8.8.8", 80))
