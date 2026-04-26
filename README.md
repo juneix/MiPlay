@@ -1,11 +1,12 @@
 # MiPlay
 
-MiPlay 是一个小米音箱的 AirPlay 无线桥接器，
-> 本项目基于 [xiaomusic](https://github.com/hanxi/xiaomusic)、[airplay2-receiver](https://github.com/openairplay/airplay2-receiver)、[MiAir](https://github.com/KiriChen-Wind/MiAir) 二次开发，自用重构版本。
+MiPlay 是一个小米音箱的 AirPlay 无线桥接器，可以把多个小米音箱一次性转发成多个独立的 AirPlay 设备。
+> 本项目基于 [XiaoMusic](https://github.com/hanxi/xiaomusic)、[AirPlay2-Receiver](https://github.com/openairplay/airplay2-receiver)、[MiAir](https://github.com/KiriChen-Wind/MiAir) 二次开发，自用重构版本。
 
 ## ✨ 功能特色
 
-- 小米音箱注册独立 AirPlay 设备 v
+- 小米音箱注册独立 AirPlay 设备
+- 支持 x86、arm64 架构
 - 可与 `Shairport-Sync`搭配使用
     - 有线音箱：`Shairport-Sync` ➡️ 有线 AirPlay 2（多房间）
     - 小米音箱：MiPlay ➡️ 无线 AirPlay 1（多设备）
