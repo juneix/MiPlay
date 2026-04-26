@@ -278,9 +278,13 @@
     }
 
     .hint {
-      margin-top: 12px;
+      margin: 12px 0 0;
       font-size: 13px;
       color: var(--muted);
+    }
+
+    .hint:empty {
+      display: none;
     }
 
     .panel-head {
@@ -354,8 +358,7 @@
       border-color: var(--accent-active);
     }
 
-    .warning {
-      margin-top: 12px;
+    .hint.warning {
       padding: 12px 14px;
       border-radius: 14px;
       background: var(--warn-soft);
@@ -364,8 +367,7 @@
       line-height: 1.6;
     }
 
-    .success {
-      margin-top: 12px;
+    .hint.success {
       padding: 12px 14px;
       border-radius: 14px;
       background: var(--good-soft);
@@ -1532,7 +1534,7 @@
         })
       });
       hint.textContent = "已保存，正在重启。";
-      hint.className = "success";
+      hint.className = "hint success";
     }
 
     async function syncDevices() {
@@ -1543,7 +1545,7 @@
       const hint = document.getElementById("accountHint");
       await fetch("/api/restart", { method: "POST" });
       hint.textContent = "已发送重启请求。";
-      hint.className = "success";
+      hint.className = "hint success";
     }
 
     function collectTargets() {
@@ -1571,7 +1573,7 @@
         body: JSON.stringify({ targets: collectTargets() })
       });
       hint.textContent = "已保存，正在重启。";
-      hint.className = "success";
+      hint.className = "hint success";
     }
   </script>
 </body>
