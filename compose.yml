@@ -9,3 +9,14 @@ services:
       MIPLAY_HOST: ${MIPLAY_HOST:-}
     volumes:
       - ./conf:/app/conf
+# 如需搭配 Shairport-Sync 使用，请取消注释
+#  shairport-sync:
+#    image: mikebrady/shairport-sync
+#    container_name: airplay2
+#    hostname: miplay 共存测试 
+#    network_mode: host
+#    restart: always
+#    devices:
+#      - /dev/snd:/dev/snd
+#    cap_add:
+#      - SYS_NICE

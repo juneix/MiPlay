@@ -26,3 +26,5 @@ nul
 .DS_Store
 Thumbs.dbf
 *.exe
+.uv_cache/
+.venv/
