@@ -1,0 +1,15 @@
+.git
+.github
+.agents
+.DS_Store
+.venv
+.uv_cache
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+conf/
+*.log
+*.pcm
+Thumbs.db

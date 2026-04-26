@@ -1,6 +1,6 @@
 [project]
 name = "miplay"
-version = "0.2.0"
+version = "2.0.0"
 description = "AirPlay bridge for Xiaomi speakers"
 readme = "README.md"
 license = {text = "MIT"}
@@ -22,3 +22,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["miplay*"]
+
+[tool.uv]
+package = true
