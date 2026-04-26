@@ -17,6 +17,7 @@ NC='\033[0m' # No Color
 
 # 配置变量
 APP_DIR="$(cd "$(dirname "$0")" && pwd)"
+PARENT_DIR="$(dirname "$APP_DIR")"
 CONTAINER_NAME="miair"
 IMAGE_NAME="miair:latest"
 
@@ -317,6 +318,7 @@ fi
 
 # 自动删除部署目录
 echo -e "${YELLOW}正在删除部署目录...${NC}"
-cd "$(dirname "$APP_DIR")"
-rm -rf "$APP_DIR"
+(
+    cd "$PARENT_DIR" && rm -rf "$APP_DIR"
+)
 echo -e "${GREEN}✓ 部署目录已删除${NC}"
