@@ -1,0 +1,12 @@
+services:
+  miplay:
+    image: ghcr.io/juneix/miplay:latest
+    container_name: miplay
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      - WEB_PORT=8300
+      - MIPLAY_HOST=
+      - WIRED_AIRPLAY_NAME=
+    volumes:
+      - ./conf:/app/conf

@@ -1,18 +1,25 @@
 {
+  "host": "192.168.1.10",
+  "web_port": 8300,
+  "verbose": false,
+  "xiaomi": {
     "account": "",
     "password": "",
-    "mi_did": "",
-    "cookie": "",
-    "hostname": "",
-    "dlna_port": 8200,
-    "web_port": 8300,
-    "conf_path": "conf",
-    "verbose": false,
-    "proxy_enabled": false,
-    "auto_play_on_set_uri": false,
-    "auto_resume_on_interrupt": false,
-    "resume_delay_seconds": 5,
-    "enable_voice_control": false,
-    "voice_poll_interval": 1,
-    "speakers": {}
+    "cookie": ""
+  },
+  "external": {
+    "wired_airplay_name": "Living Room Wired"
+  },
+  "targets": [
+    {
+      "id": "living-room-speaker",
+      "did": "",
+      "name": "Living Room Speaker",
+      "airplay_name": "Living Room Xiaomi",
+      "enabled": true,
+      "device_id": "",
+      "hardware": ""
+    }
+  ],
+  "legacy": {}
 }

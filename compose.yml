@@ -1,0 +1,11 @@
+services:
+  miplay:
+    image: ghcr.io/juneix/miplay
+    container_name: miplay
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      WEB_PORT: 8300
+      MIPLAY_HOST: ${MIPLAY_HOST:-}
+    volumes:
+      - ./conf:/app/conf

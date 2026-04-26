@@ -1,0 +1,541 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MiPlay</title>
+  <style>
+    :root {
+      --bg: #f4efe6;
+      --ink: #17212b;
+      --muted: #566371;
+      --panel: rgba(255, 252, 247, 0.92);
+      --line: rgba(23, 33, 43, 0.1);
+      --accent: #db5f28;
+      --accent-soft: rgba(219, 95, 40, 0.12);
+      --good: #237a57;
+      --warn: #9e5d12;
+      --shadow: 0 24px 60px rgba(23, 33, 43, 0.08);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(219, 95, 40, 0.16), transparent 32%),
+        radial-gradient(circle at top right, rgba(35, 122, 87, 0.12), transparent 26%),
+        linear-gradient(180deg, #f8f2ea 0%, #f4efe6 100%);
+      min-height: 100vh;
+    }
+    .page {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 28px 18px 48px;
+    }
+    .hero {
+      display: grid;
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+    .eyebrow {
+      font-size: 12px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      font-weight: 700;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(34px, 5vw, 54px);
+      line-height: 0.95;
+      letter-spacing: -0.05em;
+    }
+    .subtitle {
+      max-width: 760px;
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+    .status {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    .status strong { font-size: 16px; }
+    .status span { color: var(--muted); }
+    .grid {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: 1.1fr 0.9fr;
+    }
+    @media (max-width: 920px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+    .panel h2 {
+      margin: 0 0 8px;
+      font-size: 18px;
+    }
+    .panel p {
+      margin: 0 0 16px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .field {
+      display: grid;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+    .field label {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+    input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 14px;
+      background: #fffdf9;
+      color: var(--ink);
+    }
+    input:focus {
+      outline: 2px solid rgba(219, 95, 40, 0.18);
+      border-color: rgba(219, 95, 40, 0.4);
+    }
+    .row {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: 1fr 1fr;
+    }
+    @media (max-width: 640px) {
+      .row { grid-template-columns: 1fr; }
+    }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 11px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+    button:hover { transform: translateY(-1px); }
+    .primary {
+      background: var(--accent);
+      color: white;
+    }
+    .secondary {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+    .ghost {
+      background: rgba(23, 33, 43, 0.06);
+      color: var(--ink);
+    }
+    .hint {
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .warning {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(158, 93, 18, 0.1);
+      color: var(--warn);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .success {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(35, 122, 87, 0.1);
+      color: var(--good);
+      font-size: 13px;
+    }
+    .device-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .device {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+      background: rgba(255, 255, 255, 0.7);
+    }
+    .device-head {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .device-title {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .device-title input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      margin: 0;
+    }
+    .name {
+      font-weight: 700;
+      font-size: 15px;
+    }
+    .meta {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 2px;
+    }
+    .device-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: 1fr 1fr;
+    }
+    @media (max-width: 720px) {
+      .device-grid { grid-template-columns: 1fr; }
+    }
+    .runtime-list {
+      display: grid;
+      gap: 10px;
+    }
+    .runtime-card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+      background: rgba(255, 255, 255, 0.72);
+    }
+    .runtime-card strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 15px;
+    }
+    .runtime-card .meta {
+      line-height: 1.6;
+      white-space: pre-line;
+    }
+    .footer {
+      margin-top: 22px;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <div class="eyebrow">AirPlay Bridge</div>
+      <h1>MiPlay</h1>
+      <div class="subtitle">
+        这台机器只负责把 AirPlay 音频桥接到小米音箱。AirPlay 2 有线输出由外部
+        <code>shairport-sync</code> 提供；MiPlay 只做无线桥接与共存检测。
+      </div>
+    </section>
+
+    <section class="status" id="statusBar">
+      <div>
+        <strong id="statusTitle">Loading MiPlay...</strong>
+        <span id="statusText">正在读取运行状态。</span>
+      </div>
+      <div id="statusCounts"></div>
+    </section>
+
+    <div class="grid">
+      <section class="panel">
+        <h2>Xiaomi Account</h2>
+        <p>支持账号密码或 Cookie。只要有一项可用，MiPlay 就会尝试同步可桥接的小米音箱。</p>
+        <div class="row">
+          <div class="field">
+            <label for="account">Account</label>
+            <input id="account" placeholder="Xiaomi account">
+          </div>
+          <div class="field">
+            <label for="password">Password</label>
+            <input id="password" type="password" placeholder="Optional if Cookie is used">
+          </div>
+        </div>
+        <div class="field">
+          <label for="cookie">Cookie</label>
+          <input id="cookie" placeholder="userId=...; passToken=...">
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="host">Advertised Host</label>
+            <input id="host" placeholder="192.168.x.x">
+          </div>
+          <div class="field">
+            <label for="webPort">Web Port</label>
+            <input id="webPort" type="number" min="1" max="65535">
+          </div>
+        </div>
+        <div class="field">
+          <label for="wiredAirplayName">External Wired AirPlay Name</label>
+          <input id="wiredAirplayName" placeholder="Example: Living Room Wired">
+        </div>
+        <div class="actions">
+          <button class="secondary" id="loadDevicesBtn">Sync Xiaomi Devices</button>
+          <button class="ghost" id="restartBtn">Restart MiPlay</button>
+          <button class="primary" id="saveBtn">Save And Restart</button>
+        </div>
+        <div class="hint" id="settingsHint">AirPlay 2 receiver stays external. MiPlay only checks for name conflicts.</div>
+        <div id="warnings"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Runtime Targets</h2>
+        <p>每个已启用的小米音箱都会暴露成一个独立的 AirPlay endpoint。</p>
+        <div class="runtime-list" id="runtimeList">
+          <div class="meta">No active targets yet.</div>
+        </div>
+      </section>
+    </div>
+
+    <section class="panel" style="margin-top: 18px;">
+      <h2>Xiaomi Target Selection</h2>
+      <p>勾选要暴露给 AirPlay 的小米音箱，并为每个目标设置独立的 AirPlay 名称。</p>
+      <div class="actions">
+        <button class="secondary" id="refreshTargetsBtn">Refresh Runtime Status</button>
+      </div>
+      <div class="device-list" id="deviceList">
+        <div class="meta">Load devices to start editing targets.</div>
+      </div>
+    </section>
+
+    <div class="footer">MiPlay AirPlay-only runtime</div>
+  </div>
+
+  <script>
+    let currentTargets = [];
+    let discoveredDevices = [];
+
+    const el = (id) => document.getElementById(id);
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function renderWarnings(warnings) {
+      const wrap = el("warnings");
+      if (!warnings || warnings.length === 0) {
+        wrap.innerHTML = "";
+        return;
+      }
+      wrap.innerHTML = warnings.map((item) => `<div class="warning">${escapeHtml(item)}</div>`).join("");
+    }
+
+    function renderStatus(status) {
+      el("statusTitle").textContent = status.running ? "MiPlay is running" : "MiPlay is idle";
+      el("statusText").textContent = status.status_message || "等待配置。";
+      el("statusCounts").textContent = `${status.bridges_count} active bridge(s) / ${status.targets_count} enabled target(s)`;
+      renderWarnings([...(status.warnings || []), ...((status.external && status.external.name_conflicts) || [])]);
+    }
+
+    function mergeTargets(savedTargets, devices) {
+      const byDid = new Map(savedTargets.map((target) => [target.did, target]));
+      return devices.map((device) => {
+        const did = device.miotDID || "";
+        const existing = byDid.get(did) || {};
+        return {
+          id: existing.id || did,
+          did,
+          name: existing.name || device.name || `Xiaomi Speaker ${did}`,
+          airplay_name: existing.airplay_name || existing.name || device.name || `Xiaomi Speaker ${did}`,
+          enabled: existing.enabled || false,
+          device_id: existing.device_id || device.deviceID || "",
+          hardware: existing.hardware || device.hardware || ""
+        };
+      });
+    }
+
+    function renderDevices() {
+      const list = el("deviceList");
+      if (!discoveredDevices.length) {
+        list.innerHTML = '<div class="meta">No Xiaomi devices loaded.</div>';
+        return;
+      }
+      const merged = mergeTargets(currentTargets, discoveredDevices);
+      list.innerHTML = merged.map((target, index) => `
+        <div class="device">
+          <div class="device-head">
+            <div class="device-title">
+              <input type="checkbox" data-index="${index}" ${target.enabled ? "checked" : ""} class="toggle-target">
+              <div>
+                <div class="name">${escapeHtml(target.name)}</div>
+                <div class="meta">did=${escapeHtml(target.did)} · hardware=${escapeHtml(target.hardware || "unknown")}</div>
+              </div>
+            </div>
+          </div>
+          <div class="device-grid">
+            <div class="field" style="margin:0;">
+              <label>Display Name</label>
+              <input value="${escapeHtml(target.name)}" data-index="${index}" class="target-name">
+            </div>
+            <div class="field" style="margin:0;">
+              <label>AirPlay Name</label>
+              <input value="${escapeHtml(target.airplay_name)}" data-index="${index}" class="target-airplay-name">
+            </div>
+          </div>
+        </div>
+      `).join("");
+      currentTargets = merged;
+      bindDeviceEvents();
+    }
+
+    function bindDeviceEvents() {
+      document.querySelectorAll(".toggle-target").forEach((node) => {
+        node.addEventListener("change", (event) => {
+          const index = Number(event.target.dataset.index);
+          currentTargets[index].enabled = event.target.checked;
+        });
+      });
+      document.querySelectorAll(".target-name").forEach((node) => {
+        node.addEventListener("input", (event) => {
+          const index = Number(event.target.dataset.index);
+          currentTargets[index].name = event.target.value.trim();
+          if (!currentTargets[index].airplay_name) {
+            currentTargets[index].airplay_name = currentTargets[index].name;
+          }
+        });
+      });
+      document.querySelectorAll(".target-airplay-name").forEach((node) => {
+        node.addEventListener("input", (event) => {
+          const index = Number(event.target.dataset.index);
+          currentTargets[index].airplay_name = event.target.value.trim();
+        });
+      });
+    }
+
+    function renderRuntime(items) {
+      const list = el("runtimeList");
+      if (!items.length) {
+        list.innerHTML = '<div class="meta">No configured targets yet.</div>';
+        return;
+      }
+      list.innerHTML = items.map((item) => `
+        <div class="runtime-card">
+          <strong>${escapeHtml(item.airplay_name || item.name)}</strong>
+          <div class="meta">Xiaomi name: ${escapeHtml(item.name || "")}
+did=${escapeHtml(item.did || "")}
+rtsp=${escapeHtml(item.rtsp_port || 0)}
+client=${escapeHtml(item.client_name || "idle")}
+state=${item.active ? "playing" : (item.enabled ? "ready" : "disabled")}</div>
+        </div>
+      `).join("");
+    }
+
+    async function loadSettings(withDevices = false) {
+      const response = await fetch(`/api/setting?need_device_list=${withDevices ? "true" : "false"}`);
+      const data = await response.json();
+      el("account").value = data.xiaomi.account || "";
+      el("cookie").value = data.xiaomi.cookie || "";
+      el("host").value = data.host || "";
+      el("webPort").value = data.web_port || 8300;
+      el("wiredAirplayName").value = data.external.wired_airplay_name || "";
+      currentTargets = data.targets || [];
+      renderStatus(data.status || {});
+      if (withDevices) {
+        discoveredDevices = data.device_list || [];
+        renderDevices();
+      }
+    }
+
+    async function loadRuntime() {
+      const response = await fetch("/api/targets");
+      const data = await response.json();
+      renderRuntime(data || []);
+    }
+
+    async function syncDevices() {
+      el("settingsHint").textContent = "Syncing Xiaomi device list...";
+      await loadSettings(true);
+      el("settingsHint").textContent = discoveredDevices.length
+        ? `Loaded ${discoveredDevices.length} Xiaomi device(s).`
+        : "No Xiaomi devices returned from the account.";
+    }
+
+    async function saveSettings() {
+      const body = {
+        host: el("host").value.trim(),
+        web_port: Number(el("webPort").value) || 8300,
+        xiaomi: {
+          account: el("account").value.trim(),
+          password: el("password").value,
+          cookie: el("cookie").value.trim()
+        },
+        external: {
+          wired_airplay_name: el("wiredAirplayName").value.trim()
+        },
+        targets: currentTargets
+          .filter((item) => item.did)
+          .map((item) => ({
+            id: item.id || item.did,
+            did: item.did,
+            name: item.name || item.airplay_name || `Xiaomi Speaker ${item.did}`,
+            airplay_name: item.airplay_name || item.name || `Xiaomi Speaker ${item.did}`,
+            enabled: Boolean(item.enabled),
+            device_id: item.device_id || "",
+            hardware: item.hardware || ""
+          }))
+      };
+      el("settingsHint").textContent = "Saving MiPlay configuration...";
+      await fetch("/api/setting", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      el("settingsHint").innerHTML = '<div class="success">Configuration saved. MiPlay is restarting.</div>';
+    }
+
+    async function restartApp() {
+      el("settingsHint").textContent = "Restarting MiPlay...";
+      await fetch("/api/restart", { method: "POST" });
+      el("settingsHint").innerHTML = '<div class="success">Restart requested.</div>';
+    }
+
+    el("loadDevicesBtn").addEventListener("click", syncDevices);
+    el("refreshTargetsBtn").addEventListener("click", loadRuntime);
+    el("saveBtn").addEventListener("click", saveSettings);
+    el("restartBtn").addEventListener("click", restartApp);
+
+    Promise.all([loadSettings(false), loadRuntime()]);
+  </script>
+</body>
+</html>

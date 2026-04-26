@@ -1,82 +1,109 @@
-# MiAir - 为小爱音箱添加 DLNA 与 AirPlay 支持
+# MiPlay
 
-## 引用以下开源项目代码 由衷感谢
+MiPlay 是一个 AirPlay-only 的小米音箱无线桥接器。
 
-**[XiaoMusic](https://github.com/hanxi/xiaomusic "XiaoMusic")** &ensp; **[AirPlay2 Receiver](https://github.com/openairplay/airplay2-receiver "AirPlay2 Receiver")** &ensp; **[MaCast](https://github.com/xfangfang/Macast "MaCast")**
+它的职责很单一：
 
-## 快速开始
-## Windows
-*确保设备已安装 Python 3.12+*
+- 接收 AirPlay 1 / RAOP 音频
+- 为每个已启用的小米音箱暴露一个独立的 AirPlay endpoint
+- 把收到的音频流回推给对应的小米音箱播放
+- 与外部 AirPlay 2 接收器共存，例如 `shairport-sync`
 
-前往Release页面下载最新版本\
-进入项目目录，使用终端执行
-```python
-python miair.py
-```
-程序将自动安装相关依赖库，请确保网络畅通\
-安装完成后访问 `http://主机IP:8300` 即可打开 Web 管理界面。
+MiPlay 不包含 `shairport-sync`，也不尝试管理本机声卡输出。推荐分工如下：
 
-## Docker (Thanks @SyunSS)
+- 有线音箱：外部 `shairport-sync` 负责 AirPlay 2
+- 小米音箱：MiPlay 负责无线桥接
 
-支持平台：Linux / OpenWrt / macOS
+## 当前范围
 
-### 使用脚本部署
-```bash
-# 安装 Git
-opkg update
-opkg install git
-opkg install git-http
+- 保留 `RAOP` / `AirPlay 1` 接收能力
+- 移除新主运行时中的 `DLNA / Plex / 语音控制`
+- 使用新的配置模型 `xiaomi + targets[] + external`
+- 提供 Web UI 管理小米账号、设备同步、AirPlay 名称和共存提示
 
-# 克隆项目
-git clone -b docker https://github.com/KiriChen-Wind/MiAir.git
-cd MiAir
-
-# 赋予权限并运行安装脚本
-chmod +x deploy.sh manage.sh
-./deploy.sh
-```
-
-### 在线镜像部署
-```bash
-docker run -d \
-  --name miair \
-  --network=host \
-  -e MIAIR_HOSTNAME=你的局域网IP \
-  ghcr.io/syunss/miair:latest
-```
-
-> **示例：** `MIAIR_HOSTNAME=192.168.31.1`
-
-### 本地构建部署
+## 启动
 
 ```bash
-git clone -b docker https://github.com/SyunSS/MiAir.git
-cd MiAir
-docker build -t miair .
-docker run -d --name miair --network=host -e MIAIR_HOSTNAME=你的IP miair
+pip install .
+miplay serve --conf-path conf
 ```
-安装完成后访问 `http://容器宿主机IP:8300` 即可打开 Web 管理界面。
-请确保容器网络为Host。\
-部分情况下，修改配置后容器可能无法自动重启，请手动重启容器。
 
-### Docker 相关命令
+或：
+
 ```bash
-docker logs -f miair     # 查看日志
-docker stop miair        # 停止
-docker start miair       # 启动
-docker restart miair     # 重启
+python miplay.py
 ```
 
+启动后访问：
 
-## 我们
-**[需要帮助&交流&测试版本发布](https://qun.qq.com/universal-share/share?ac=1&authKey=1zXhx2zxgw9GG2mkecypT9clD7q0B3W3l4K0D4fQirmpDWakz0Oy2BI3ocDrgzbh&busi_data=eyJncm91cENvZGUiOiI3NDEyNjcyOTgiLCJ0b2tlbiI6InYwbitXQTF5cE9MaUJCR0hMUk03OWV0WkFoMThxbjJRaWI4dHVlbUpGdW5OdEZBVEpXMXF0T1dQUnRmRXRzYVgiLCJ1aW4iOiIxODQxOTM4MDQwIn0%3D&data=_OrA-eASJMwYwx-Uj-BReC1Xh3zGAdkn8CQskbEsQ5S66bhqvvO6dJ-QrSlRl-Ks00l5XDw1FANE8Um0w5yB8Q&svctype=4&tempid=h5_group_info "需要帮助&交流&测试版本发布")**
+```text
+http://<你的主机IP>:8300
+```
 
-## 后续 可能 添加的功能
+## 本地测试
 
-- ~~支持 Docker 部署~~ ✅ 已支持
-- 支持 OpenWrt 部署
-- ~~支持 MacOS 部署~~
-- ......
+macOS 上优先直接运行 Python 版本，先不要急着上 Docker：
 
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+miplay serve --conf-path conf --host 你的局域网IP --web-port 8300
+```
 
-[![preview](https://raw.githubusercontent.com/KiriChen-Wind/MiAir/main/preview.png "preview")](https://raw.githubusercontent.com/KiriChen-Wind/MiAir/main/preview.png "preview")
+建议测试顺序：
+
+1. 在 Web UI 里填入小米账号或 Cookie
+2. 同步设备并只启用一个小米音箱 target
+3. 用 iPhone / iPad / Mac 在同一局域网里搜索该 AirPlay 名称
+4. 确认音频能桥接到目标小米音箱
+
+如果你要在 macOS 上用 Docker Desktop 测试 `network_mode: host`，官方文档说明这只在 Docker Desktop 4.34+ 可用，而且需要手动开启 host networking。
+
+## macOS AirPlay 冲突
+
+MiPlay 当前的 Web UI 固定端口是 `8300`，AirPlay RTSP 和内部音频流端口都由程序动态分配，所以真正容易冲突的通常不是固定端口，而是“接收器名字”和“系统自带 AirPlay Receiver”。
+
+macOS 官方文档说明可以在：
+
+`System Settings > General > AirDrop & Handoff > AirPlay Receiver`
+
+里开启 AirPlay Receiver。测试 MiPlay 时建议先把它关闭，原因是：
+
+- iPhone / iPad 会同时发现你的 Mac 和 MiPlay
+- 如果名称起得太像，容易选错目标
+- 你后续再和外部 `shairport-sync` 共存时，也更容易判断是谁在广播
+
+如果你不想关闭它，也可以共存，但要保证：
+
+- MiPlay target 的 `airplay_name` 与系统 AirPlay 名称不同
+- 外部 `shairport-sync` 的名称也不同
+- `8300` 没有被别的服务占用
+
+## 配置示例
+
+见 [config-example.json](config-example.json)。
+
+关键字段：
+
+- `host`：MiPlay 广播给局域网的主机 IP
+- `xiaomi.account / password / cookie`：小米账号信息
+- `targets[]`：要桥接的小米音箱列表
+- `targets[].airplay_name`：暴露给 iPhone / Mac 的 AirPlay 名称
+- `external.wired_airplay_name`：外部有线 AirPlay 接收器名称，只用于名称冲突提示
+
+## Docker Compose
+
+只启动 MiPlay：
+
+```bash
+docker compose up -d
+```
+
+如需和外部 AirPlay 2 接收器一起部署：
+
+```bash
+docker compose -f compose.yml -f compose.external.yml up -d
+```
+
+`compose.external.yml` 只是示例，不会把 `shairport-sync` 作为 MiPlay 依赖。

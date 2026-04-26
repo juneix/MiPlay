@@ -1,0 +1,12 @@
+services:
+  miplay:
+    build: .
+    image: ghcr.io/juneix/miplay:dev
+    environment:
+      WEB_PORT: 8300
+      MIPLAY_HOST: ${MIPLAY_HOST:-}
+    volumes:
+      - ./conf:/app/conf
+      - ./miplay:/app/miplay
+      - ./miplay.py:/app/miplay.py
+      - ./pyproject.toml:/app/pyproject.toml:ro
