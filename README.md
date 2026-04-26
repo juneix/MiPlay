@@ -5,7 +5,7 @@ MiPlay 是一个小米音箱的 AirPlay 无线桥接器，
 
 ## ✨ 功能特色
 
-- 小米音箱注册独立 AirPlay 设备
+- 小米音箱注册独立 AirPlay 设备 v
 - 可与 `Shairport-Sync`搭配使用
     - 有线音箱：`Shairport-Sync` ➡️ 有线 AirPlay 2（多房间）
     - 小米音箱：MiPlay ➡️ 无线 AirPlay 1（多设备）
@@ -29,7 +29,6 @@ services:
 #  shairport-sync:
 #    image: mikebrady/shairport-sync
 #    container_name: airplay2
-#    hostname: miplay 共存测试 
 #    network_mode: host
 #    restart: always
 #    devices:
