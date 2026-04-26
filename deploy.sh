@@ -304,7 +304,7 @@ echo -e "${GREEN}✓ 清理完成${NC}"
 echo -e "${GREEN}[8/8] 启动 MiAir 容器...${NC}"
 
 # 构建环境变量参数
-ENV_VARS="-e TZ=Asia/Shanghai -e MIAIR_HOSTNAME=$HOST_IP -e CONTAINER_NAME=$CONTAINER_NAME"
+ENV_VARS="-e TZ=Asia/Shanghai -e MIAIR_HOSTNAME=$HOST_IP"
 [ -n "$MI_USER" ] && ENV_VARS="$ENV_VARS -e MI_USER=$MI_USER"
 [ -n "$MI_PASS" ] && ENV_VARS="$ENV_VARS -e MI_PASS=$MI_PASS"
 [ -n "$MI_DID" ] && ENV_VARS="$ENV_VARS -e MI_DID=$MI_DID"
@@ -357,10 +357,3 @@ else
     echo "docker logs miair"
     exit 1
 fi
-
-# 自动删除部署目录
-echo -e "${YELLOW}正在删除部署目录...${NC}"
-(
-    cd "$PARENT_DIR" && rm -rf "$APP_DIR"
-)
-echo -e "${GREEN}✓ 部署目录已删除${NC}"
