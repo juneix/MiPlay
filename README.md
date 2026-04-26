@@ -28,32 +28,12 @@ opkg install git
 opkg install git-http
 
 # 克隆项目
-git clone -b docker https://github.com/KiriChen-Wind/MiAir.git
+git clone https://github.com/KiriChen-Wind/MiAir.git
 cd MiAir
 
 # 赋予权限并运行安装脚本
 chmod +x deploy.sh manage.sh
 ./deploy.sh
-```
-
-### 在线镜像部署
-```bash
-docker run -d \
-  --name miair \
-  --network=host \
-  -e MIAIR_HOSTNAME=你的局域网IP \
-  ghcr.io/syunss/miair:latest
-```
-
-> **示例：** `MIAIR_HOSTNAME=192.168.31.1`
-
-### 本地构建部署
-
-```bash
-git clone -b docker https://github.com/SyunSS/MiAir.git
-cd MiAir
-docker build -t miair .
-docker run -d --name miair --network=host -e MIAIR_HOSTNAME=你的IP miair
 ```
 
 安装完成后访问 `http://容器宿主机IP:8300` 即可打开 Web 管理界面。
