@@ -13,7 +13,6 @@ services:
 #  shairport-sync:
 #    image: mikebrady/shairport-sync
 #    container_name: airplay2
-#    hostname: miplay 共存测试 
 #    network_mode: host
 #    restart: always
 #    devices:
