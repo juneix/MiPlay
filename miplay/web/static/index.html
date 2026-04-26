@@ -55,6 +55,8 @@
 
     * {
       box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
     }
 
     body {
@@ -103,17 +105,28 @@
       font-weight: 700;
     }
 
-    .theme-toggle {
+    .theme-toggle,
+    .badge-info {
       border: 1px solid var(--line);
       background: var(--panel);
       color: var(--ink);
       border-radius: 999px;
-      padding: 10px 14px;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
       box-shadow: var(--shadow);
+      padding: 0;
+      transition: all 0.2s ease;
+    }
+
+    .theme-toggle:hover,
+    .badge-info:hover {
+      border-color: var(--line-strong);
+      background: var(--accent-soft);
+      transform: translateY(-1px);
     }
 
     .theme-toggle:hover {
@@ -135,25 +148,7 @@
     }
 
     .status {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: 16px 18px;
-      box-shadow: var(--shadow);
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 18px;
-    }
-
-    .status strong {
-      font-size: 16px;
-    }
-
-    .status span {
-      color: var(--muted);
+      display: none;
     }
 
     .grid {
@@ -206,7 +201,6 @@
       font-weight: 700;
       letter-spacing: 0.08em;
       color: var(--muted);
-      text-transform: uppercase;
     }
 
     input {
@@ -293,38 +287,71 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 14px;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
     }
 
-    .panel-head .panel-copy {
-      min-width: 0;
-      flex: 1;
+    .panel-head-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .panel-head h2 {
+      margin: 0;
+      white-space: nowrap;
+    }
+
+    .badge-capsule {
+      background: var(--good-soft);
+      color: var(--good);
+      padding: 0 12px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      height: 24px;
+      box-sizing: border-box;
     }
 
     .icon-btn {
-      width: 42px;
-      height: 42px;
+      padding: 0 10px !important;
+      height: 24px !important;
       border-radius: 999px;
       border: 1px solid var(--line);
-      background: var(--panel);
-      color: var(--accent);
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
+      background: var(--item-bg);
+      color: var(--muted);
+      display: inline-flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      justify-content: center !important;
+      gap: 6px !important;
+      font-size: 11px !important;
       font-weight: 700;
-      box-shadow: var(--shadow);
+      line-height: 1 !important;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-sizing: border-box;
+      vertical-align: middle;
+      text-decoration: none;
+    }
+
+    .icon-btn i,
+    .icon-btn svg {
+      width: 14px !important;
+      height: 14px !important;
+      stroke-width: 2.5;
+      display: block !important;
+      margin: 0 !important;
       flex-shrink: 0;
     }
 
-    .icon-btn-label {
-      display: none;
-    }
-
     .icon-btn:hover {
-      border-color: var(--line-strong);
       background: var(--accent-soft);
+      color: var(--accent);
+      border-color: var(--accent-active);
     }
 
     .warning {
@@ -545,10 +572,20 @@
     }
 
     .footer {
-      margin-top: 22px;
+      margin-top: 32px;
       color: var(--muted);
-      font-size: 12px;
+      font-size: 13px;
       text-align: center;
+    }
+
+    .footer a {
+      color: var(--ink);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
     }
 
     .pc-only {
@@ -626,11 +663,6 @@
     }
 
 
-    .icon-btn i {
-      width: 20px;
-      height: 20px;
-    }
-
     @media (max-width: 720px) {
       .pc-only {
         display: none !important;
@@ -642,23 +674,6 @@
 
       .page {
         padding: 20px 14px 32px;
-      }
-
-      .panel-head {
-        align-items: flex-start;
-      }
-
-      .icon-btn {
-        width: auto;
-        height: 42px;
-        padding: 0 14px;
-        gap: 8px;
-      }
-
-      .icon-btn-label {
-        display: inline;
-        font-size: 13px;
-        font-weight: 700;
       }
 
       .device-row {
@@ -699,18 +714,329 @@
         grid-row: 2 / 3;
         grid-column: 1 / 3;
         margin-top: 4px;
+
+      }
+    }
+
+    /* --- Consolidated Modal CSS --- */
+    dialog.modal {
+      background: transparent !important;
+      border: none !important;
+      padding: 0 !important;
+      margin: auto !important;
+      outline: none !important;
+      box-shadow: none !important;
+      max-width: 100vw;
+      max-height: 100vh;
+      overflow: visible;
+      z-index: 2000;
+    }
+
+    dialog.modal::backdrop {
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+
+    .modal-box {
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 32px;
+      width: calc(100vw - 2rem);
+      max-width: 440px;
+      max-height: 90vh;
+      padding: 0;
+      position: relative;
+      box-shadow: 0 40px 100px rgba(0, 0, 0, 0.15);
+      overflow: hidden;
+      color: var(--ink);
+      animation: modalFadeIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      display: flex;
+      flex-direction: column;
+    }
+
+    [data-theme="dark"] .modal-box {
+      background: #1c1c1e;
+      border-color: rgba(255, 255, 255, 0.1);
+      box-shadow: 0 40px 100px rgba(0, 0, 0, 0.6);
+    }
+
+    @media (min-width: 800px) {
+      .modal-box {
+        max-width: 800px;
+        aspect-ratio: 4 / 3;
+        max-height: 85vh;
+        height: auto;
+      }
+      
+      .modal-inner {
+        padding: 40px 60px;
       }
 
-      .info-line.top {
-        display: block;
-        /* Stack on mobile */
+      .modal-qr-box img {
+        width: 180px;
+        height: 180px;
       }
 
-      .model-text {
-        text-align: left;
-        margin-top: 2px;
-        display: block;
+      .modal-qr-group {
+        gap: 60px;
       }
+    }
+
+    @keyframes modalFadeIn {
+      from {
+        transform: scale(0.95) translateY(20px);
+        opacity: 0;
+      }
+
+      to {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .modal-inner {
+      padding: 32px 24px;
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-inner::-webkit-scrollbar {
+      display: none;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      cursor: pointer;
+      color: var(--muted);
+      background: var(--line);
+      border: none;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+      z-index: 10;
+    }
+
+    .modal-close i {
+      width: 24px;
+      height: 24px;
+      stroke-width: 3;
+    }
+
+    .modal-close:hover {
+      background: var(--line-strong);
+      transform: rotate(90deg);
+      color: var(--ink);
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+
+    .modal-icon-box {
+      width: 72px;
+      height: 72px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #007aff;
+      box-shadow: var(--shadow);
+    }
+
+    .modal-icon-box i {
+      width: 36px;
+      height: 36px;
+      stroke-width: 2.5;
+    }
+
+    [data-theme="dark"] .modal-icon-box {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .modal-title-group h3 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .modal-title-group p {
+      margin: 6px 0 0;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .modal-intro {
+      font-size: 15px;
+      line-height: 1.8;
+      color: var(--ink);
+      opacity: 0.8;
+      margin-bottom: 32px;
+    }
+
+    .modal-intro a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .modal-alert {
+      background: var(--warn-soft);
+      border: 1px solid rgba(245, 99, 0, 0.15);
+      color: var(--warn);
+      padding: 16px 20px;
+      border-radius: 16px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 32px;
+    }
+
+    .modal-section-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--muted);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .modal-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .modal-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      background: var(--panel);
+      border: 1px solid var(--line);
+    }
+
+    .modal-btn:active {
+      transform: scale(0.96);
+    }
+
+    .modal-btn.bilibili {
+      color: #fb7299;
+      border-color: rgba(251, 114, 153, 0.2);
+      background: rgba(251, 114, 153, 0.05);
+    }
+
+    .modal-btn.xhs {
+      color: #ff2442;
+      border-color: rgba(255, 36, 66, 0.2);
+      background: rgba(255, 36, 66, 0.05);
+    }
+
+    .modal-btn.qq {
+      color: #12b7f5;
+      border-color: rgba(18, 183, 245, 0.2);
+      background: rgba(18, 183, 245, 0.05);
+    }
+
+    .modal-btn.github {
+      color: var(--ink);
+      border-color: var(--line);
+    }
+
+    .modal-donate {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      padding: 32px;
+      margin-top: 32px;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+
+    .modal-donate p {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+
+    .modal-qr-group {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+    }
+
+    .modal-qr-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .modal-qr-box img {
+      width: 112px;
+      height: 112px;
+      border-radius: 20px;
+      background: #fff;
+      padding: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      object-fit: contain;
+    }
+
+    @media (min-width: 800px) {
+      .modal-qr-box img {
+        width: 180px;
+        height: 180px;
+      }
+
+      .modal-qr-group {
+        gap: 60px;
+      }
+    }
+
+    .modal-qr-box span {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .modal-footer {
+      margin-top: 40px;
+      text-align: center;
+      font-size: 11px;
+      color: var(--muted);
+      opacity: 0.5;
+      padding-bottom: 12px;
+    }
+
+    .modal-footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
     }
   </style>
 </head>
@@ -720,44 +1046,45 @@
     <section class="hero">
       <div class="hero-top">
         <div class="eyebrow">AIRPLAY BRIDGE</div>
-        <button class="theme-toggle" id="themeToggle" type="button">夜间</button>
+        <div style="display: flex; gap: 10px;">
+          <button class="badge-info" id="infoBtn" type="button" aria-label="关于">
+            <i data-lucide="badge-info"></i>
+          </button>
+          <button class="theme-toggle" id="themeToggle" type="button" aria-label="切换主题"></button>
+        </div>
       </div>
       <h1>MiPlay</h1>
       <div class="subtitle">
-        MiPlay ➡️ 无线 AirPlay 1，可搭配 Shairport Sync ➡️ 无线 AirPlay 2 共存。
+        MiPlay ➡️ 无线 AirPlay 1，可搭配 Shairport Sync ➡️ 有线 AirPlay 2 共存。
       </div>
     </section>
 
-    <section class="status" id="statusBar">
-      <div>
-        <strong id="statusTitle">正在读取状态</strong>
-        <span id="statusText">请稍候。</span>
-      </div>
-      <div id="statusCounts"></div>
-    </section>
+    <section class="status" id="statusBar" style="display:none;"></section>
 
     <div class="grid">
       <section class="panel">
-        <h2>小米账号</h2>
-        <p>支持账号密码或 Cookie。</p>
+        <div class="panel-head">
+          <h2>小米账号</h2>
+        </div>
+        <p>请使用 Cookies 登录，账号登录测试中</p>
         <div class="row">
           <div class="field">
             <label for="account">账号</label>
-            <input id="account" placeholder="Xiaomi account">
+            <input id="account" placeholder="测试中">
           </div>
           <div class="field">
             <label for="password">密码</label>
-            <input id="password" type="password" placeholder="Optional if Cookie is used">
+            <input id="password" type="password" placeholder="测试中">
           </div>
         </div>
         <div class="row">
           <div class="field">
             <label for="userId">userId</label>
-            <input id="userId" placeholder="userId">
+            <input id="userId" placeholder="登录 account.xiaomi.com">
           </div>
           <div class="field">
             <label for="passToken">passToken</label>
-            <input id="passToken" type="password" placeholder="passToken">
+            <input id="passToken" type="password" placeholder="浏览器 F12 查看 Cookies">
           </div>
         </div>
         <p class="hint" id="accountHint"></p>
@@ -769,15 +1096,16 @@
 
       <section class="panel panel-stack">
         <div class="panel-head">
-          <div class="panel-copy">
+          <div class="panel-head-left">
             <h2>音箱列表</h2>
-            <p>勾选要转发 AirPlay 的小米音箱</p>
+            <div id="panelBadge" class="badge-capsule">运行中 -/-</div>
           </div>
-          <button class="icon-btn" id="syncDevicesBtn" type="button" title="同步设备" aria-label="同步设备">
+          <button class="icon-btn" id="syncDevicesBtn" type="button">
             <i data-lucide="refresh-ccw"></i>
             <span class="icon-btn-label">同步设备</span>
           </button>
         </div>
+        <p>勾选要启用 AirPlay 的音箱</p>
         <div class="device-list" id="deviceList">
           <div class="loading">请先登录并同步设备</div>
         </div>
@@ -788,7 +1116,81 @@
       </section>
     </div>
 
-    <div class="footer">MiPlay AirPlay-only runtime</div>
+    <div class="footer">
+      Made with ♥️ by <a href="https://juneix.github.io" target="_blank">谢週五</a>丨Powered by <a
+        href="https://github.com/KiriChen-Wind/MiAir" target="_blank">MiAir</a>
+    </div>
+
+    <!-- About Modal -->
+    <dialog id="about_modal" class="modal">
+      <div class="modal-box">
+        <form method="dialog">
+          <button class="modal-close"><i data-lucide="x"></i></button>
+        </form>
+
+        <div class="modal-inner">
+          <div class="modal-header">
+            <div class="modal-icon-box"><i data-lucide="airplay"></i></div>
+            <div class="modal-title-group">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <h3>隔空播放</h3>
+                <span
+                  style="padding:2px 6px; background:rgba(56,189,248,0.2); color:#38bdf8; font-size:10px; font-weight:800; border-radius:6px; border:1px solid rgba(56,189,248,0.3);">v6.0</span>
+              </div>
+              <p>让音乐荡漾在每个房间</p>
+            </div>
+          </div>
+
+          <div class="modal-intro">
+            👋 Hi～我叫 <a href="https://juneix.github.io" target="_blank">@谢週五</a>。隔空播放（AirPlay）现已入驻 fnOS，了解如何使用音频投送功能，请移步
+            <a href="https://www.apple.com.cn/airplay/" target="_blank">苹果官网</a> 及 <a
+              href="https://support.apple.com/zh-cn/105068" target="_blank">支持文档</a>。
+          </div>
+
+          <div class="modal-alert">
+            <i data-lucide="shield-alert" style="width:14px;"></i>
+            <span>本应用与苹果公司无关，严禁用于商业目的。</span>
+          </div>
+
+          <div class="modal-section-title">🚀 交流与支持</div>
+          <p style="font-size:11px; color:var(--muted); margin-bottom:12px;">欢迎转发分享本项目，关注社媒动态、加群催更互动！</p>
+
+          <div class="modal-grid">
+            <a href="https://space.bilibili.com/765334/" target="_blank" class="modal-btn bilibili">
+              <img src="https://cdn.simpleicons.org/bilibili/FB7299" style="width:14px;"> B 站 · 教程
+            </a>
+            <a href="https://xhslink.com/m/XSWtx7YRfI/" target="_blank" class="modal-btn xhs">
+              <img src="https://cdn.simpleicons.org/xiaohongshu/FF2442" style="width:14px;"> 小红书 · 攻略
+            </a>
+            <a href="https://qm.qq.com/q/ZzOD5Qbhce/" target="_blank" class="modal-btn qq">
+              <img src="https://cdn.simpleicons.org/qq/1EBAFC" style="width:14px;"> QQ 群 · 催更
+            </a>
+            <a href="https://github.com/juneix/MiPlay" target="_blank" class="modal-btn github">
+              <i data-lucide="github" style="width:14px;"></i> GitHub · 开源
+            </a>
+          </div>
+
+          <div class="modal-donate">
+            <p>☕️ 打赏鼓励，支持我开发更多有趣应用～</p>
+            <div class="modal-qr-group">
+              <div class="modal-qr-box">
+                <img src="/static/wechat.webp" alt="微信">
+                <span>微信</span>
+              </div>
+              <div class="modal-qr-box">
+                <img src="/static/alipay.webp" alt="支付宝">
+                <span>支付宝</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <p>Made with ❤️ by <a href="https://juneix.github.io" target="_blank">谢週五</a></p>
+            <p style="margin-top:4px; opacity:0.5;">© 2026 保留所有权利</p>
+          </div>
+        </div>
+      </div>
+    </dialog>
   </div>
 
   <script>
@@ -838,26 +1240,53 @@
     }
 
     function applyTheme(theme) {
+      const isDark = theme === "dark";
       document.documentElement.setAttribute("data-theme", theme);
-      document.getElementById("themeToggle").textContent = theme === "dark" ? "日间" : "夜间";
+      const btn = document.getElementById("themeToggle");
+      if (theme === "auto") {
+        const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.setAttribute("data-theme", systemDark ? "dark" : "light");
+        btn.innerHTML = '<i data-lucide="sun-moon"></i>';
+      } else {
+        btn.innerHTML = isDark ? '<i data-lucide="moon-star"></i>' : '<i data-lucide="sun"></i>';
+      }
+      if (window.lucide) lucide.createIcons();
     }
 
     function initTheme() {
-      const savedTheme = localStorage.getItem(themeStorageKey);
-      const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-      const theme = savedTheme || (prefersDark ? "dark" : "light");
-      applyTheme(theme);
+      const savedTheme = localStorage.getItem(themeStorageKey) || "auto";
+      applyTheme(savedTheme);
+
       document.getElementById("themeToggle").addEventListener("click", () => {
-        const current = document.documentElement.getAttribute("data-theme") || "light";
-        const next = current === "dark" ? "light" : "dark";
+        const current = localStorage.getItem(themeStorageKey) || "auto";
+        let next = "light";
+        if (current === "light") next = "dark";
+        else if (current === "dark") next = "auto";
         localStorage.setItem(themeStorageKey, next);
         applyTheme(next);
+      });
+
+      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e) => {
+        if (localStorage.getItem(themeStorageKey) === "auto" || !localStorage.getItem(themeStorageKey)) {
+          applyTheme("auto");
+        }
       });
     }
 
     async function init() {
       initTheme();
       bindEvents();
+
+      const modal = document.getElementById("about_modal");
+      document.getElementById("infoBtn").addEventListener("click", () => {
+        modal.showModal();
+        if (window.lucide) lucide.createIcons();
+      });
+
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) modal.close();
+      });
+
       await Promise.all([fetchSetting(true), fetchRuntimeTargets()]);
       if (window.lucide) {
         lucide.createIcons();
@@ -890,18 +1319,15 @@
     }
 
     function renderStatus(status) {
-      const title = document.getElementById("statusTitle");
-      const text = document.getElementById("statusText");
-      const counts = document.getElementById("statusCounts");
-
-      if (status.running) {
-        title.textContent = "MiPlay 运行中";
-        text.textContent = status.status_message || "已启动。";
-      } else {
-        title.textContent = "MiPlay 未运行";
-        text.textContent = status.status_message || "等待配置。";
+      const panelBadge = document.getElementById("panelBadge");
+      if (panelBadge) {
+        if (status.running) {
+          panelBadge.textContent = `运行中 ${status.bridges_count || 0}/${status.targets_count || 0}`;
+          panelBadge.style.display = "inline-block";
+        } else {
+          panelBadge.style.display = "none";
+        }
       }
-      counts.textContent = `${status.bridges_count || 0} 个运行中 / ${status.targets_count || 0} 个已启用`;
     }
 
     async function fetchSetting(withDevices = false) {
@@ -939,8 +1365,18 @@
 
       if (!discoveredDevices.length) {
         container.innerHTML = '<div class="loading">未发现设备，请先同步。</div>';
+        document.getElementById("panelBadge").style.display = "none";
         return;
       }
+
+      const enabledCount = discoveredDevices.filter(d => {
+        const saved = savedMap.get(d.miotDID || "");
+        return saved && saved.enabled;
+      }).length;
+
+      const badge = document.getElementById("panelBadge");
+      badge.textContent = `运行中 ${enabledCount}/${discoveredDevices.length}`;
+      badge.style.display = "flex";
 
       container.innerHTML = discoveredDevices.map((device) => {
         const did = device.miotDID || "";
@@ -957,10 +1393,10 @@
         const songTitle = metadata.title || "";
         const songArtist = metadata.artist || "";
         const songAlbum = metadata.album || "";
-        
+
         let statusText = "";
         let metaHtml = "";
-        
+
         if (isPlaying) {
           if (songTitle) {
             statusText = `${escapeHtml(songArtist)} - ${escapeHtml(songTitle)}`;
@@ -971,7 +1407,7 @@
         } else {
           statusText = enabled ? "待命" : "未启用";
         }
-        
+
         const portText = runtime.rtsp_port ? runtime.rtsp_port : "n/a";
         const dotClass = isPlaying ? "playing" : (enabled ? "idle" : "");
         const finalImagePath = (isPlaying && artwork) ? artwork : imagePath;
