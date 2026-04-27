@@ -190,6 +190,31 @@
       line-height: 1.6;
     }
 
+    .panel p a {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--ink);
+      font-weight: 600;
+      text-decoration: underline;
+      text-underline-offset: 0.16em;
+    }
+
+    .panel p a svg {
+      width: 0.95em;
+      height: 0.95em;
+      stroke-width: 2.2;
+    }
+
+    .panel p code {
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 0.95em;
+      font-family: "SFMono-Regular", "SF Mono", "Consolas", monospace;
+    }
+
     .field {
       display: grid;
       gap: 6px;
@@ -1070,25 +1095,25 @@
         <div class="panel-head">
           <h2>小米账号</h2>
         </div>
-        <p>请使用 Cookies 登录，账号登录测试中</p>
+        <p>请打开 <a href="https://account.xiaomi.com" target="_blank" rel="noopener noreferrer">小米官网 <i data-lucide="external-link"></i></a> 登录，浏览器按 F12 查看<code>应用</code>><code>Cookie</code></p>
         <div class="row">
           <div class="field">
-            <label for="account">账号</label>
-            <input id="account" placeholder="测试中">
+            <label for="userId">userId</label>
+            <input id="userId" placeholder="8-10 位纯数字">
           </div>
           <div class="field">
-            <label for="password">密码</label>
-            <input id="password" type="password" placeholder="测试中">
+            <label for="passToken">passToken</label>
+            <input id="passToken" type="password" placeholder="V1:xxxxxx 一长串字符">
           </div>
         </div>
         <div class="row">
           <div class="field">
-            <label for="userId">userId</label>
-            <input id="userId" placeholder="登录 account.xiaomi.com">
+            <label for="account">账号</label>
+            <input id="account" placeholder="测试中勿用">
           </div>
           <div class="field">
-            <label for="passToken">passToken</label>
-            <input id="passToken" type="password" placeholder="浏览器 F12 查看 Cookies">
+            <label for="password">密码</label>
+            <input id="password" type="password" placeholder="测试中勿用">
           </div>
         </div>
         <p class="hint" id="accountHint"></p>
@@ -1533,7 +1558,7 @@
           }
         })
       });
-      hint.textContent = "已保存，正在重启。";
+      hint.textContent = "已保存，正在重启…";
       hint.className = "hint success";
     }
 
@@ -1572,7 +1597,7 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ targets: collectTargets() })
       });
-      hint.textContent = "已保存，正在重启。";
+      hint.textContent = "已保存，正在重启…";
       hint.className = "hint success";
     }
   </script>
