@@ -51,7 +51,7 @@ docker run -d \
   --network host \
   --restart unless-stopped \
   -e WEB_PORT=8300 \
-  -v "$(pwd)/conf:/app/conf" \
+  -v "${PWD}/conf:/app/conf" \
   ghcr.io/juneix/miplay
   # docker.1ms.run/juneix/miplay # 毫秒镜像加速 
 ```
