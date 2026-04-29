@@ -254,6 +254,20 @@
       .row {
         grid-template-columns: 1fr;
       }
+
+      .split-actions {
+        align-items: stretch;
+      }
+
+      .actions-group,
+      .actions-group-end {
+        width: 100%;
+      }
+
+      .actions-group-end {
+        margin-left: 0;
+        justify-content: flex-end;
+      }
     }
 
     .actions {
@@ -264,9 +278,33 @@
     }
 
     .actions.bottom-right {
-      margin-top: auto;
       justify-content: flex-end;
+    }
+
+    .panel-footer {
+      margin-top: auto;
       padding-top: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .split-actions {
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 16px;
+    }
+
+    .actions-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .actions-group-end {
+      margin-left: auto;
+      justify-content: flex-end;
     }
 
     button {
@@ -281,6 +319,16 @@
 
     button:hover {
       transform: translateY(-1px);
+    }
+
+    button:disabled {
+      opacity: 0.58;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    button:disabled:hover {
+      transform: none;
     }
 
     .primary {
@@ -303,7 +351,7 @@
     }
 
     .hint {
-      margin: 12px 0 0;
+      margin: 0;
       font-size: 13px;
       color: var(--muted);
     }
@@ -398,6 +446,15 @@
       background: var(--good-soft);
       color: var(--good);
       font-size: 13px;
+    }
+
+    .hint.pending {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 13px;
+      line-height: 1.6;
     }
 
     .device-list {
@@ -596,6 +653,13 @@
       padding: 24px;
       color: var(--muted);
       font-size: 13px;
+    }
+
+    .loading.warning {
+      color: var(--warn);
+      background: var(--warn-soft);
+      border-radius: 16px;
+      line-height: 1.6;
     }
 
     .footer {
@@ -1099,7 +1163,7 @@
         <div class="row">
           <div class="field">
             <label for="userId">userId</label>
-            <input id="userId" placeholder="8-10 位纯数字">
+            <input id="userId" placeholder="7-10 位纯数字">
           </div>
           <div class="field">
             <label for="passToken">passToken</label>
@@ -1117,9 +1181,14 @@
           </div>
         </div>
         <p class="hint" id="accountHint"></p>
-        <div class="actions" style="justify-content:flex-end;">
-          <button class="ghost" id="restartBtn">重启 MiPlay</button>
-          <button class="primary" id="loginBtn">登录账号</button>
+        <div class="actions split-actions">
+          <div class="actions-group">
+            <button class="ghost" id="restartBtn" type="button">重启</button>
+            <button class="ghost" id="downloadLogsBtn" type="button">日志</button>
+          </div>
+          <div class="actions-group actions-group-end">
+            <button class="primary" id="loginBtn" type="button">登录</button>
+          </div>
         </div>
       </section>
 
@@ -1138,9 +1207,11 @@
         <div class="device-list" id="deviceList">
           <div class="loading">请先登录并同步设备</div>
         </div>
-        <p class="hint" id="saveHint"></p>
-        <div class="actions bottom-right">
-          <button class="primary" id="saveBtn">保存并重启</button>
+        <div class="panel-footer">
+          <p class="hint" id="saveHint"></p>
+          <div class="actions bottom-right">
+            <button class="primary" id="saveBtn" type="button">保存</button>
+          </div>
         </div>
       </section>
     </div>
@@ -1258,6 +1329,18 @@
     let currentTargets = [];
     let discoveredDevices = [];
     let runtimeTargets = [];
+    let currentDeviceListError = "";
+
+    const SUCCESS_HINT_MS = 3000;
+    const ERROR_HINT_MS = 5000;
+    const RESTART_READY_TIMEOUT_MS = 20000;
+    const RESTART_POLL_INTERVAL_MS = 800;
+    const RESTART_GRACE_MS = 1000;
+    const actionButtonIds = ["syncDevicesBtn", "restartBtn", "downloadLogsBtn", "loginBtn", "saveBtn"];
+    const hintTimeouts = {
+      accountHint: null,
+      saveHint: null
+    };
 
     document.addEventListener("DOMContentLoaded", init);
 
@@ -1267,6 +1350,60 @@
         .replaceAll("<", "&lt;")
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;");
+    }
+
+    function sleep(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    function withCacheBuster(url) {
+      const joiner = url.includes("?") ? "&" : "?";
+      return `${url}${joiner}_=${Date.now()}`;
+    }
+
+    function clearHintTimeout(hintId) {
+      if (hintTimeouts[hintId]) {
+        clearTimeout(hintTimeouts[hintId]);
+        hintTimeouts[hintId] = null;
+      }
+    }
+
+    function setHint(hintId, text = "", tone = "", autoHideMs = 0) {
+      const hint = document.getElementById(hintId);
+      if (!hint) return;
+
+      clearHintTimeout(hintId);
+      hint.textContent = text;
+      hint.className = tone ? `hint ${tone}` : "hint";
+
+      if (text && autoHideMs > 0) {
+        hintTimeouts[hintId] = window.setTimeout(() => {
+          hint.textContent = "";
+          hint.className = "hint";
+          hintTimeouts[hintId] = null;
+        }, autoHideMs);
+      }
+    }
+
+    function setActionButtonsDisabled(disabled) {
+      actionButtonIds.forEach((id) => {
+        const button = document.getElementById(id);
+        if (button) button.disabled = disabled;
+      });
+    }
+
+    async function parseJsonResponse(response) {
+      let data = {};
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
+      }
+
+      if (!response.ok) {
+        throw new Error(data.message || `请求失败 (${response.status})`);
+      }
+      return data;
     }
 
     function applyTheme(theme) {
@@ -1317,7 +1454,11 @@
         if (e.target === modal) modal.close();
       });
 
-      await Promise.all([fetchSetting(true), fetchRuntimeTargets()]);
+      try {
+        await refreshDashboard(true);
+      } catch (error) {
+        setHint("saveHint", error.message || "初始化失败，请刷新页面重试", "warning", ERROR_HINT_MS);
+      }
       if (window.lucide) {
         lucide.createIcons();
       }
@@ -1326,6 +1467,7 @@
     function bindEvents() {
       document.getElementById("syncDevicesBtn").addEventListener("click", syncDevices);
       document.getElementById("restartBtn").addEventListener("click", restartApp);
+      document.getElementById("downloadLogsBtn").addEventListener("click", downloadLogs);
       document.getElementById("loginBtn").addEventListener("click", saveAccount);
       document.getElementById("saveBtn").addEventListener("click", saveTargets);
     }
@@ -1361,8 +1503,10 @@
     }
 
     async function fetchSetting(withDevices = false) {
-      const response = await fetch(`/api/setting?need_device_list=${withDevices ? "true" : "false"}`);
-      const data = await response.json();
+      const response = await fetch(withCacheBuster(`/api/setting?need_device_list=${withDevices ? "true" : "false"}`), {
+        cache: "no-store"
+      });
+      const data = await parseJsonResponse(response);
       currentSetting = data;
       currentTargets = data.targets || [];
       renderStatus(data.status || {});
@@ -1374,18 +1518,94 @@
         const passTokenMatch = data.xiaomi.cookie.match(/passToken=([^;]+)/);
         document.getElementById("userId").value = userIdMatch ? userIdMatch[1] : "";
         document.getElementById("passToken").value = passTokenMatch ? passTokenMatch[1] : "";
+      } else {
+        document.getElementById("userId").value = "";
+        document.getElementById("passToken").value = "";
       }
 
       if (withDevices) {
         discoveredDevices = data.device_list || [];
+        currentDeviceListError = data.device_list_error || "";
       }
       renderDeviceList();
+      return data;
     }
 
     async function fetchRuntimeTargets() {
-      const response = await fetch("/api/targets");
-      runtimeTargets = await response.json();
+      const response = await fetch(withCacheBuster("/api/targets"), { cache: "no-store" });
+      runtimeTargets = await parseJsonResponse(response);
       renderDeviceList();
+      return runtimeTargets;
+    }
+
+    async function refreshDashboard(withDevices = true) {
+      await Promise.all([fetchSetting(withDevices), fetchRuntimeTargets()]);
+      return {
+        ok: !withDevices || !currentDeviceListError,
+        deviceListError: currentDeviceListError
+      };
+    }
+
+    async function waitForServiceReady() {
+      await sleep(RESTART_GRACE_MS);
+
+      const deadline = Date.now() + RESTART_READY_TIMEOUT_MS;
+      while (Date.now() < deadline) {
+        try {
+          const response = await fetch(withCacheBuster("/api/status"), { cache: "no-store" });
+          await parseJsonResponse(response);
+          return;
+        } catch {
+          await sleep(RESTART_POLL_INTERVAL_MS);
+        }
+      }
+
+      throw new Error("服务恢复超时，请稍后重试");
+    }
+
+    async function submitRestartingAction({
+      request,
+      hintId,
+      pendingText,
+      successText,
+      requestFailureText,
+      readyFailureText,
+      syncFailureText
+    }) {
+      setActionButtonsDisabled(true);
+      setHint(hintId, pendingText, "pending");
+
+      try {
+        await request();
+      } catch (error) {
+        setHint(hintId, requestFailureText || error.message || "操作失败，请稍后重试", "warning", ERROR_HINT_MS);
+        setActionButtonsDisabled(false);
+        return false;
+      }
+
+      try {
+        await waitForServiceReady();
+      } catch (error) {
+        setHint(hintId, readyFailureText || error.message || "服务恢复失败，请稍后重试", "warning", ERROR_HINT_MS);
+        setActionButtonsDisabled(false);
+        return false;
+      }
+
+      try {
+        const result = await refreshDashboard(true);
+        if (!result.ok) {
+          setHint(hintId, syncFailureText || "同步失败，请稍后重试", "warning", ERROR_HINT_MS);
+          return false;
+        }
+
+        setHint(hintId, successText, "success", SUCCESS_HINT_MS);
+        return true;
+      } catch (error) {
+        setHint(hintId, syncFailureText || error.message || "同步失败，请稍后重试", "warning", ERROR_HINT_MS);
+        return false;
+      } finally {
+        setActionButtonsDisabled(false);
+      }
     }
 
     function renderDeviceList() {
@@ -1394,7 +1614,13 @@
       const savedMap = new Map((currentTargets || []).map((item) => [item.did, item]));
 
       if (!discoveredDevices.length) {
-        container.innerHTML = '<div class="loading">未发现设备，请先同步。</div>';
+        if (currentDeviceListError) {
+          container.innerHTML = `<div class="loading warning">同步失败：${escapeHtml(currentDeviceListError)}</div>`;
+        } else if (!currentSetting.xiaomi?.has_credentials) {
+          container.innerHTML = '<div class="loading">请先登录并同步设备</div>';
+        } else {
+          container.innerHTML = '<div class="loading">未发现设备，请先同步。</div>';
+        }
         document.getElementById("panelBadge").style.display = "none";
         return;
       }
@@ -1539,38 +1765,98 @@
       const userId = document.getElementById("userId").value.trim();
       const passToken = document.getElementById("passToken").value.trim();
       const cookie = buildCookie(userId, passToken);
-      const hint = document.getElementById("accountHint");
 
       if (!cookie && !(account && password)) {
-        hint.textContent = "请输入账号密码或 userId / passToken。";
-        hint.className = "hint warning";
+        setHint("accountHint", "请输入账号密码或 userId / passToken。", "warning", ERROR_HINT_MS);
         return;
       }
 
-      await fetch("/api/setting", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          xiaomi: {
-            account,
-            password,
-            cookie
-          }
-        })
+      await submitRestartingAction({
+        hintId: "accountHint",
+        pendingText: "正在登录并同步…",
+        successText: "登录成功，设备已同步",
+        requestFailureText: "登录请求发送失败，请稍后重试",
+        readyFailureText: "登录信息已保存，但服务恢复失败，请稍后重试",
+        syncFailureText: "登录失败，请检查 cookie 或网络设置",
+        request: () => fetch("/api/setting", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            xiaomi: {
+              account,
+              password,
+              cookie
+            }
+          })
+        }).then(parseJsonResponse)
       });
-      hint.textContent = "已保存，正在重启…";
-      hint.className = "hint success";
     }
 
     async function syncDevices() {
-      await fetchSetting(true);
+      setActionButtonsDisabled(true);
+      setHint("saveHint", "正在同步设备…", "pending");
+      try {
+        const result = await refreshDashboard(true);
+        if (!result.ok) {
+          setHint("saveHint", "同步失败，请检查 cookie 或网络设置", "warning", ERROR_HINT_MS);
+          return;
+        }
+        setHint("saveHint", "设备已同步", "success", SUCCESS_HINT_MS);
+      } catch (error) {
+        setHint("saveHint", error.message || "同步失败，请稍后重试", "warning", ERROR_HINT_MS);
+      } finally {
+        setActionButtonsDisabled(false);
+      }
     }
 
     async function restartApp() {
-      const hint = document.getElementById("accountHint");
-      await fetch("/api/restart", { method: "POST" });
-      hint.textContent = "已发送重启请求。";
-      hint.className = "hint success";
+      await submitRestartingAction({
+        hintId: "accountHint",
+        pendingText: "正在重启服务…",
+        successText: "服务已重启，页面已更新",
+        requestFailureText: "重启请求发送失败，请稍后重试",
+        readyFailureText: "重启后服务恢复超时，请稍后重试",
+        syncFailureText: "服务已重启，但同步失败，请重试或下载日志",
+        request: () => fetch("/api/restart", { method: "POST" }).then(parseJsonResponse)
+      });
+    }
+
+    async function downloadLogs() {
+      const button = document.getElementById("downloadLogsBtn");
+      button.disabled = true;
+      setHint("accountHint", "正在准备日志…", "pending");
+
+      try {
+        const response = await fetch(withCacheBuster("/api/logs/download"), { cache: "no-store" });
+        if (!response.ok) {
+          let message = `下载失败 (${response.status})`;
+          try {
+            const data = await response.json();
+            message = data.message || message;
+          } catch {
+            // Ignore JSON parsing failures for file downloads.
+          }
+          throw new Error(message);
+        }
+
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const disposition = response.headers.get("Content-Disposition") || "";
+        const filenameMatch = disposition.match(/filename="([^"]+)"/);
+        const filename = filenameMatch ? filenameMatch[1] : `miplay-${Date.now()}.log`;
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(objectUrl);
+        setHint("accountHint", "日志已开始下载", "success", SUCCESS_HINT_MS);
+      } catch (error) {
+        setHint("accountHint", error.message || "下载日志失败，请稍后重试", "warning", ERROR_HINT_MS);
+      } finally {
+        button.disabled = false;
+      }
     }
 
     function collectTargets() {
@@ -1591,14 +1877,19 @@
     }
 
     async function saveTargets() {
-      const hint = document.getElementById("saveHint");
-      await fetch("/api/setting", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targets: collectTargets() })
+      await submitRestartingAction({
+        hintId: "saveHint",
+        pendingText: "正在应用配置…",
+        successText: "配置已应用",
+        requestFailureText: "配置保存失败，请稍后重试",
+        readyFailureText: "配置已保存，但服务恢复失败，请稍后重试",
+        syncFailureText: "配置已保存，但同步失败，请重试或下载日志",
+        request: () => fetch("/api/setting", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ targets: collectTargets() })
+        }).then(parseJsonResponse)
       });
-      hint.textContent = "已保存，正在重启…";
-      hint.className = "hint success";
     }
   </script>
 </body>

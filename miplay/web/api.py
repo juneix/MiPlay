@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 import os
 import sys
 
@@ -84,6 +85,18 @@ def create_web_app(config: Config, app_instance) -> web.Application:
         asyncio.get_running_loop().call_soon(_restart_process)
         return response
 
+    async def handle_download_logs(request: web.Request):
+        log_path = os.path.join(config.conf_path, "miplay.log")
+        if not os.path.exists(log_path):
+            return web.json_response({"ok": False, "message": "暂无日志可下载"}, status=404)
+
+        filename = f"miplay-{datetime.now().strftime('%Y%m%d-%H%M%S')}.log"
+        headers = {
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+        }
+        return web.FileResponse(log_path, headers=headers)
+
     async def handle_get_devices(request: web.Request):
         devices = await app_instance.get_all_devices()
         return web.json_response({"devices": devices})
@@ -111,6 +124,7 @@ def create_web_app(config: Config, app_instance) -> web.Application:
     web_app.router.add_get("/api/setting", handle_get_setting)
     web_app.router.add_post("/api/setting", handle_save_setting)
     web_app.router.add_post("/api/restart", handle_restart)
+    web_app.router.add_get("/api/logs/download", handle_download_logs)
     web_app.router.add_get("/api/devices", handle_get_devices)
     web_app.router.add_get("/api/targets", handle_get_targets)
     web_app.router.add_get("/api/status", handle_status)
