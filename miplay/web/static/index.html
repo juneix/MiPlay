@@ -4,7 +4,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MiPlay</title>
+  <title>MiPlay - 隔空播放桥接器</title>
+  <link rel="icon" type="image/png" href="/static/icon.png">
+  <link rel="apple-touch-icon" href="/static/icon.png">
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
     :root {
@@ -140,6 +142,21 @@
       letter-spacing: -0.05em;
     }
 
+    .brand-title {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-mark {
+      /* 微调首页标题图标大小时，优先改这两个值；想拉开或缩紧图标与标题距离，改上面的 .brand-title gap。 */
+      width: clamp(38px, 4.2vw, 52px);
+      height: clamp(38px, 4.2vw, 52px);
+      object-fit: contain;
+      flex-shrink: 0;
+      filter: drop-shadow(0 10px 20px rgba(23, 33, 43, 0.12));
+    }
+
     .subtitle {
       max-width: 760px;
       font-size: 15px;
@@ -155,12 +172,31 @@
       display: grid;
       gap: 18px;
       grid-template-columns: minmax(320px, 0.85fr) minmax(420px, 1.15fr);
+      grid-template-areas:
+        "account speaker"
+        "guide speaker";
       align-items: start;
+    }
+
+    .panel-account {
+      grid-area: account;
+    }
+
+    .panel-speakers {
+      grid-area: speaker;
+    }
+
+    .panel-guide {
+      grid-area: guide;
     }
 
     @media (max-width: 920px) {
       .grid {
         grid-template-columns: 1fr;
+        grid-template-areas:
+          "account"
+          "speaker"
+          "guide";
       }
     }
 
@@ -215,6 +251,41 @@
       font-family: "SFMono-Regular", "SF Mono", "Consolas", monospace;
     }
 
+    .guide-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 12px;
+    }
+
+    .guide-item {
+      display: grid;
+      gap: 4px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.62);
+      border: 1px solid var(--line);
+    }
+
+    :root[data-theme="dark"] .guide-item {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .guide-step {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+
+    .guide-text {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+
     .field {
       display: grid;
       gap: 6px;
@@ -256,17 +327,21 @@
       }
 
       .split-actions {
-        align-items: stretch;
+        align-items: center;
+        flex-wrap: nowrap;
+        gap: 12px;
       }
 
       .actions-group,
       .actions-group-end {
-        width: 100%;
+        width: auto;
+        flex-wrap: nowrap;
       }
 
       .actions-group-end {
-        margin-left: 0;
+        margin-left: auto;
         justify-content: flex-end;
+        flex-shrink: 0;
       }
     }
 
@@ -948,12 +1023,15 @@
       justify-content: center;
       color: #7dd3fc;
       box-shadow: var(--shadow);
+      overflow: hidden;
     }
 
-    .modal-icon-box i {
-      width: 36px;
-      height: 36px;
-      stroke-width: 2.5;
+    .modal-icon-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: inherit;
+      display: block;
     }
 
     [data-theme="dark"] .modal-icon-box {
@@ -1146,20 +1224,23 @@
           <button class="theme-toggle" id="themeToggle" type="button" aria-label="切换主题"></button>
         </div>
       </div>
-      <h1>MiPlay</h1>
+      <h1 class="brand-title">
+        <img class="brand-mark" src="/static/icon.png" alt="MiPlay 图标">
+        <span>MiPlay</span>
+      </h1>
       <div class="subtitle">
-        MiPlay ➡️ 无线 AirPlay 1，可搭配 Shairport Sync ➡️ 有线 AirPlay 2 共存。
+        <p>MiPlay 是小米音箱的<code>隔空播放桥接器</code>，可以把多个小米音箱转换为独立 AirPlay 1 设备。</p>
       </div>
     </section>
 
     <section class="status" id="statusBar" style="display:none;"></section>
 
     <div class="grid">
-      <section class="panel">
+      <section class="panel panel-account">
         <div class="panel-head">
           <h2>小米账号</h2>
         </div>
-        <p>请打开 <a href="https://account.xiaomi.com" target="_blank" rel="noopener noreferrer">小米官网 <i data-lucide="external-link"></i></a> 登录，浏览器按 F12 查看<code>应用</code>><code>Cookie</code></p>
+        <p>打开 <a href="https://account.xiaomi.com" target="_blank" rel="noopener noreferrer">小米官网 <i data-lucide="external-link"></i></a> 登录，手机使用 Alook、Via 浏览器查看；电脑浏览器按 F12 查看<code>应用</code>><code>Cookie</code>。</p>
         <div class="row">
           <div class="field">
             <label for="userId">userId</label>
@@ -1192,7 +1273,7 @@
         </div>
       </section>
 
-      <section class="panel panel-stack">
+      <section class="panel panel-stack panel-speakers">
         <div class="panel-head">
           <div class="panel-head-left">
             <h2>音箱列表</h2>
@@ -1214,6 +1295,27 @@
           </div>
         </div>
       </section>
+
+      <section class="panel panel-guide">
+        <div class="panel-head">
+          <h2>常见问题</h2>
+        </div>
+        <p>关于 AirPlay 的一些使用建议和经验分享</p>
+        <div class="guide-list">
+          <div class="guide-item">
+            <div class="guide-step">AirPlay 1 和 2 区别?</div>
+            <div class="guide-text">投屏软件、MiPlay 都是 1 代，2 代支持多房间同步，延迟低、稳定性好，支持家庭自动化。</div>
+          </div>
+          <div class="guide-item">
+            <div class="guide-step">传统有线音箱能用吗?</div>
+            <div class="guide-text">音乐发烧友，推荐有线音箱 ➕ Shairport Sync = AirPlay 2，音质体验更佳，飞牛商店可一键部署。</div>
+          </div>
+          <div class="guide-item">
+            <div class="guide-step">其他智能音箱能用吗?</div>
+            <div class="guide-text">小度音箱、天猫精灵等其他 DLNA 音箱请使用 AirConnect 转 AirPlay 1，暂不考虑集成。</div>
+          </div>
+        </div>
+      </section>
     </div>
 
     <div class="footer">
@@ -1230,7 +1332,9 @@
 
         <div class="modal-inner">
           <div class="modal-header">
-            <div class="modal-icon-box"><i data-lucide="airplay"></i></div>
+            <div class="modal-icon-box">
+              <img class="modal-icon-image" src="/static/icon.png" alt="MiPlay 图标">
+            </div>
             <div class="modal-title-group">
               <div style="display:flex; align-items:center; gap:8px;">
                 <h3>隔空播放</h3>
@@ -1298,29 +1402,29 @@
     const themeStorageKey = "miplay-theme";
     const deviceModelMap = {
       "L06A": { model: "小爱音箱", image: "L06A.webp" },
-      "L07A": { model: "Redmi小爱音箱 Play", image: "L07A.webp" },
-      "S12": { model: "小米AI音箱", image: "S12_S12A_MDZ-25-DA.webp" },
-      "S12A": { model: "小米AI音箱", image: "S12_S12A_MDZ-25-DA.webp" },
-      "MDZ-25-DA": { model: "小米AI音箱", image: "S12_S12A_MDZ-25-DA.webp" },
+      "L07A": { model: "Redmi 小爱音箱 Play", image: "L07A.webp" },
+      "S12": { model: "小米 AI 音箱", image: "S12_S12A_MDZ-25-DA.webp" },
+      "S12A": { model: "小米 AI 音箱", image: "S12_S12A_MDZ-25-DA.webp" },
+      "MDZ-25-DA": { model: "小米 AI 音箱", image: "S12_S12A_MDZ-25-DA.webp" },
       "LX5A": { model: "小爱音箱 万能遥控版", image: "LX5A.webp" },
-      "LX05": { model: "小爱音箱Play (2019款)", image: "LX05.webp" },
+      "LX05": { model: "小爱音箱 Play (2019款)", image: "LX05.webp" },
       "L15A": { model: "小米AI音箱（第二代）", image: "L15A.webp" },
       "L16A": { model: "Xiaomi Sound", image: "L16A.webp" },
       "L17A": { model: "Xiaomi Sound Pro", image: "L17A.webp" },
-      "LX06": { model: "小爱音箱Pro", image: "LX06.webp" },
-      "LX01": { model: "小爱音箱mini", image: "LX01.webp" },
-      "L05B": { model: "小爱音箱Play", image: "L05B.webp" },
-      "L05C": { model: "小爱音箱Play 增强版", image: "L05C.webp" },
-      "L09A": { model: "小爱音箱Art", image: "L09A.webp" },
-      "L09B": { model: "小爱音箱Art 电池版", image: "L09B.webp" },
+      "LX06": { model: "小爱音箱 Pro", image: "LX06.webp" },
+      "LX01": { model: "小爱音箱 mini", image: "LX01.webp" },
+      "L05B": { model: "小爱音箱 Play", image: "L05B.webp" },
+      "L05C": { model: "小爱音箱 Play 增强版", image: "L05C.webp" },
+      "L09A": { model: "小爱音箱 Art", image: "L09A.webp" },
+      "L09B": { model: "小爱音箱 Art 电池版", image: "L09B.webp" },
       "LX04": { model: "小爱触屏音箱", image: "LX04_X10A_X08A.webp" },
       "X10A": { model: "小爱触屏音箱", image: "LX04_X10A_X08A.webp" },
       "X08A": { model: "小爱触屏音箱", image: "LX04_X10A_X08A.webp" },
       "X08C": { model: "小米触屏音箱", image: "X08C_X08E_X8F.webp" },
       "X08E": { model: "小米触屏音箱", image: "X08C_X08E_X8F.webp" },
       "X8F": { model: "小米触屏音箱", image: "X08C_X08E_X8F.webp" },
-      "M01": { model: "小爱音箱HD", image: "L05B.webp" },
-      "XMYX01JY": { model: "小爱音箱HD", image: "L05B.webp" },
+      "M01": { model: "小爱音箱 HD", image: "L05B.webp" },
+      "XMYX01JY": { model: "小爱音箱 HD", image: "L05B.webp" },
       "OH2P": { model: "Xiaomi 智能音箱 Pro", image: "OH2P.webp" },
       "OH2": { model: "Xiaomi 智能音箱", image: "OH2.webp" }
     };
