@@ -73,7 +73,7 @@ class Config:
     # 语音控制
     enable_voice_control: bool = False
     # 自动重启（当登录失败或服务异常时）
-    auto_restart: bool = True
+    auto_restart: bool = False
     voice_poll_interval: int = 1
     speakers: dict = field(default_factory=dict)
 
