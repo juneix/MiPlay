@@ -16,11 +16,27 @@ log = logging.getLogger("miair")
 
 def _is_docker():
     """检测是否在 Docker 容器中运行"""
+    # 1. 环境变量显式指定（最可靠）
+    if os.environ.get("MIAIR_DOCKER"):
+        return True
+    # 2. Docker 会在容器根目录创建 .dockerenv 文件
+    if os.path.exists("/.dockerenv"):
+        return True
+    # 3. 检查 cgroup（兼容 cgroup v1 和 v2）
     try:
         with open('/proc/1/cgroup', 'r') as f:
-            return 'docker' in f.read()
-    except:
-        return False
+            content = f.read()
+            return any(k in content for k in ('docker', 'containerd', 'kubepods'))
+    except Exception:
+        pass
+    # 4. 检查 /proc/self/mountinfo 中的 overlay/docker 挂载
+    try:
+        with open('/proc/self/mountinfo', 'r') as f:
+            content = f.read()
+            return 'docker' in content or '/docker/' in content
+    except Exception:
+        pass
+    return False
 
 def _restart_process():
     """重启当前 Python 进程"""
@@ -31,14 +47,12 @@ def _restart_process():
         # Docker 环境下，直接退出进程
         # Docker 容器已设置 restart=unless-stopped，会自动重启
         log.info("在 Docker 环境中，退出进程，Docker 会自动重启容器")
-        import os
-        os._exit(1)
+        # 使用 exit code 0，unless-stopped 策略下任何退出都会重启
+        os._exit(0)
     elif sys.platform == "win32":
         # Windows 上 os.execv 行为不同，使用 subprocess 重启
         import subprocess
         subprocess.Popen([sys.executable] + sys.argv)
-        # 退出当前进程
-        import os
         os._exit(0)
     else:
         os.execv(sys.executable, [sys.executable] + sys.argv)
