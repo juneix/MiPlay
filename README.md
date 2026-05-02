@@ -39,7 +39,9 @@ chmod +x deploy.sh manage.sh
 
 安装完成后访问 `http://容器宿主机IP:8300` 即可打开 Web 管理界面。
 请确保容器网络为Host。\
+请确保 Docker 容器重启策略设定为 Unless Stopped。\
 部分情况下，修改配置后容器可能无法自动重启，请手动重启容器。
+
 
 ### Docker 相关命令
 ```bash
