@@ -105,6 +105,12 @@ class MiAir:
                 self._did_to_udn.clear()
                 if hasattr(self, 'speaker_manager'):
                     self.speaker_manager.controllers.clear()
+
+                # 如果开启了自动重启，则尝试重启
+                if self.config.auto_restart:
+                    log.warning("未获取到设备列表，正在尝试自动重启程序...")
+                    from miair.web.api import _restart_process
+                    asyncio.get_running_loop().call_later(5, _restart_process)
                 return
 
             # 初始化音箱

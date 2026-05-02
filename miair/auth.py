@@ -128,7 +128,12 @@ class AuthManager:
                     log.warning("检测到登录失败，正在尝试自动重启程序以恢复服务...")
                     from miair.web.api import _restart_process
                     import asyncio
-                    asyncio.get_running_loop().call_later(5, _restart_process)
+                    try:
+                        loop = asyncio.get_running_loop()
+                        loop.call_later(5, _restart_process)
+                    except RuntimeError:
+                        # 如果没有正在运行的 loop，则直接重启
+                        _restart_process()
 
         # 无论是否登录成功，都设置 service (方便后续重试)
         self.mina_service = MiNAService(self.account)
