@@ -28,15 +28,22 @@ echo -e "${BLUE}====================================================${NC}"
 echo -e "${BLUE}        MiPlay 隔空妙播一键部署脚本             ${NC}"
 echo -e "${BLUE}====================================================${NC}"
 
-# ==================== 0. 网络环境探测与国内 CDN 加速配置 ====================
-GH_PROXY=""
-if ! curl -Is -m 1 https://github.com >/dev/null 2>&1; then
-    echo -e "${YELLOW}[!] 检测到国内网络环境，已自动激活高速 CDN 专线 (GHProxy & 阿里云镜像)${NC}"
-    GH_PROXY="https://ghproxy.net/"
+# ==================== 0. 安装源选择 ====================
+echo -e "${YELLOW}请选择安装环境与镜像源:${NC}"
+echo -e "  1) 国际源 (GitHub 直连 + PyPI 官方源)"
+echo -e "  2) 国内源 (GHProxy 加速 + 阿里云镜像源)"
+echo -n "👉 请输入数字 [1/2] (默认 1): "
+read -r SOURCE_OPT < /dev/tty 2>/dev/null || read -r SOURCE_OPT || SOURCE_OPT="1"
+echo ""
+
+if [ "$SOURCE_OPT" = "2" ]; then
+    echo -e "${GREEN}✓ 已选择：国内镜像源${NC}"
     export UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/"
     export UV_PYTHON_INSTALL_MIRROR="https://ghproxy.net/https://github.com/astral-sh/python-build-standalone/releases/download"
+    GH_PROXY="https://ghproxy.net/"
 else
-    echo -e "${GREEN}✓ 国际互联网直连就绪${NC}"
+    echo -e "${GREEN}✓ 已选择：国际官方源${NC}"
+    GH_PROXY=""
 fi
 
 # ==================== 1. 卸载流程 ====================
@@ -68,32 +75,25 @@ if [ "$1" = "--uninstall" ] || [ "$1" = "uninstall" ]; then
     exit 0
 fi
 
-# ==================== 2. FFmpeg 可选交互检测与安装 ====================
+# ==================== 2. FFmpeg 检测与选择 ====================
 if command -v ffmpeg >/dev/null 2>&1; then
-    echo -e "${GREEN}✓ 已检测到系统 FFmpeg 音频转码引擎就绪${NC}"
+    echo -e "${GREEN}✓ 已检测到系统已安装 FFmpeg${NC}"
 else
-    echo -e "${YELLOW}[!] 检测到系统未安装 FFmpeg 音频转码引擎。${NC}"
-    echo -e "    ${BLUE}说明：小米音箱硬件原生支持 MP3/M4A/FLAC/WAV/M3U8 直连播放；仅在需要非标准音频流实时转码时才依赖 FFmpeg。${NC}"
-    
-    INSTALL_FFMPEG="n"
-    # 支持在 curl | bash 管道模式下通过 /dev/tty 读取用户交互选择
-    if [ -t 0 ]; then
-        read -r -p "👉 是否现在安装 FFmpeg？[y/N] (默认 N 跳过): " choice
-        INSTALL_FFMPEG="${choice:-n}"
-    elif [ -e /dev/tty ]; then
-        read -r -p "👉 是否现在安装 FFmpeg？[y/N] (默认 N 跳过): " choice < /dev/tty 2>/dev/null || choice="n"
-        INSTALL_FFMPEG="${choice:-n}"
-    fi
+    echo -e "${YELLOW}[!] 检测到系统未安装 FFmpeg 音频工具。${NC}"
+    echo -n "👉 是否安装 FFmpeg？[y/N] (回车默认 N): "
+    read -r INSTALL_FFMPEG < /dev/tty 2>/dev/null || read -r INSTALL_FFMPEG || true
+    INSTALL_FFMPEG="${INSTALL_FFMPEG:-n}"
+    echo ""
 
-    if [[ "$INSTALL_FFMPEG" =~ ^[Yy]$ ]]; then
-        echo -e "正在通过系统包管理器安装 FFmpeg..."
+    if [ "$INSTALL_FFMPEG" = "y" ] || [ "$INSTALL_FFMPEG" = "Y" ]; then
+        echo -e "正在安装 FFmpeg..."
         if command -v apk >/dev/null 2>&1; then # Alpine
             apk add --no-cache ffmpeg
         elif command -v apt-get >/dev/null 2>&1; then # Debian / Ubuntu
             if [ "$(id -u)" -ne 0 ]; then
-                sudo apt-get update -qq && sudo apt-get install -y ffmpeg
+                sudo apt-get update && sudo apt-get install -y ffmpeg
             else
-                apt-get update -qq && apt-get install -y ffmpeg
+                apt-get update && apt-get install -y ffmpeg
             fi
         elif command -v dnf >/dev/null 2>&1; then # Fedora / RHEL
             if [ "$(id -u)" -ne 0 ]; then sudo dnf install -y ffmpeg; else dnf install -y ffmpeg; fi
@@ -113,13 +113,13 @@ else
             echo -e "${GREEN}✓ FFmpeg 安装成功！${NC}"
         fi
     else
-        echo -e "${YELLOW}[i] 已跳过 FFmpeg 安装（后续可随时手动安装）。${NC}"
+        echo -e "${YELLOW}[i] 已跳过 FFmpeg 安装。${NC}"
     fi
 fi
 
 # ==================== 3. 极速包管理器 uv 检测与安装 ====================
 if ! command -v uv >/dev/null 2>&1 && [ ! -f "$HOME/.local/bin/uv" ] && [ ! -f "$HOME/.cargo/bin/uv" ]; then
-    echo -e "${YELLOW}[!] 正在安装极速运行工具 uv...${NC}"
+    echo -e "正在安装极速包管理器 uv..."
     curl -LsSf "${GH_PROXY}https://astral.sh/uv/install.sh" | sh
 fi
 
@@ -131,10 +131,10 @@ if ! command -v uv >/dev/null 2>&1; then
     exit 1
 fi
 
-echo -e "${GREEN}✓ 极速运行引擎 uv 就绪: $(uv --version)${NC}"
+echo -e "${GREEN}✓ uv 就绪: $(uv --version)${NC}"
 
 # ==================== 4. 安装 miplay-hub ====================
-echo -e "正在安装/更新 ${GREEN}miplay-hub${NC}..."
+echo -e "正在安装 ${GREEN}miplay-hub${NC}..."
 
 # 优先 PyPI 在线安装，失败时从 GitHub Releases wheel 兜底安装
 WHEEL_FALLBACK="${GH_PROXY}https://github.com/${REPO}/releases/latest/download/miplay-1.0.1-py3-none-any.whl"
