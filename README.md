@@ -1,6 +1,6 @@
 # MiPlay 
 
-MiPlay（隔空妙播）是专为苹果用户和小米音箱打造的**局域网音频中枢**，它可以把小米音箱桥接为 AirPlay 1 设备、首发🔥`MiPlay 全屋播放`，另有 `Web 虚拟音箱`、`通用音频 API`、`兼容 OwnTone` 等开放式玩法。
+MiPlay（隔空妙播）是专为苹果用户和小米音箱打造的**局域网音频中枢**，它可以把小米音箱桥接为 AirPlay 1 设备、首发🔥`MiPlay 全屋播放引擎`，另有 `Web 虚拟音箱`、`通用音频 API`、`兼容 OwnTone` 等开放式玩法。
 > 本项目参考了[airplay2-receiver](https://github.com/openairplay/airplay2-receiver)、[MiAir](https://github.com/KiriChen-Wind/MiAir)、[miair-next](https://github.com/deerwan/miair-next)、[miservice-fork](https://pypi.org/project/miservice-fork/)、[XiaoMusic](https://github.com/hanxi/xiaomusic) 等项目的部分思路，面向自用场景进行了大量重构。
 
 ![miplay-1.webp](./img/miplay-1.webp)
@@ -31,6 +31,13 @@ MiPlay（隔空妙播）是专为苹果用户和小米音箱打造的**局域网
 | **硬件加密门槛** |  ✅ 无门槛 | ☑️ 苹果授权 | ☑️ 苹果授权 | ✅ 无门槛 | 🔒 小米独占 |
 
 > 🔊 **MiPlay 支持音箱列表** ➡️ [点我跳转查看](./speaker.md)
+
+### 🎵 音频处理与格式支持
+
+* **原生直连格式**：`.mp3`、`.m4a`、`.flac`、`.wav`、`.m3u8`
+  - 小米音箱硬件原生解码，音频数据由中枢直接转发，0 额外 CPU 转码开销，无损低延迟。
+* **中枢转码扩展**：
+  - 内置静态编译 **FFmpeg** 引擎，支持将非标准流实时转码推流至各个音箱端。
 
 ⚠️ 本项目主要是完善苹果用户的小米音箱 ✖️ AirPlay 体验，暂不考虑 DLNA 功能。
 - DLNA 是一个古早的音频协议，虽然新老设备都能用，但体验不太好、稳定性欠佳
@@ -112,44 +119,31 @@ docker run -d \
 
 ### 3、桌面客户端 (Windows / macOS)
 
-从 [Releases 页面](https://github.com/juneix/MiPlay/releases) 下载对应平台的程序文件：
-- **🪟 Windows**：下载 `MiPlay-Windows-x64.exe`，双击运行。
-- **🍎 macOS**：下载 `MiPlay-macOS-arm64.zip`，解压后双击 `MiPlay.app` 运行，或复制到 `/Applications` 应用程序文件夹。
+从 [Releases 页面](https://github.com/juneix/MiPlay/releases) 下载对应平台的桌面客户端：
+- **🪟 Windows**：下载 `MiPlay-Windows.zip`，解压后直接双击 **`MiPlay.exe`** 运行。
+- **🍎 macOS**：下载 `MiPlay-macOS.zip`，解压后直接双击 **`MiPlay.app`** 运行（或拖入 `/Applications` 应用程序文件夹）。
+
+> 💡 运行后软件将自动常驻在系统托盘（Windows 右下角 / macOS 顶部菜单栏），右键图标可快速打开控制台、定位配置目录、查看运行日志或退出应用。
 
 ---
 
-### 4、Linux 服务器 / NAS
+### 4、uv 一键安装 (Linux / macOS / Windows / Termux)
 
-适用于主流 Linux 发行版，支持一键注册为后台守护服务：
+a. **已有 uv 环境**：
+  > 直接运行 `uv tool install miplay`
+
+b. 没有 uv 环境：
+
+使用下面的一键脚本可以帮你安装 uv 和 miplay。
 
 ```bash
-# 方式 A：一键在线安装并注册 Systemd 开机自启服务
+# 🐧 Linux / 🍎 macOS / 📱 安卓 Termux (Linux 自动注册 Systemd 开机自启服务)
 curl -fsSL https://raw.githubusercontent.com/juneix/MiPlay/main/scripts/install.sh | bash
 
-# 方式 B：手动下载独立裸文件运行
-# x86_64: curl -L -o miplay https://github.com/juneix/MiPlay/releases/latest/download/miplay-linux-amd64
-# ARM64:  curl -L -o miplay https://github.com/juneix/MiPlay/releases/latest/download/miplay-linux-arm64
-chmod +x miplay
-sudo ./miplay service install   # 注册并启动系统服务
+# 🪟 Windows (PowerShell 一键安装)
+powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/juneix/MiPlay/main/scripts/install.ps1 | iex"
 ```
 
----
-
-### 5、Android 安卓手机 (Termux PRoot)
-
-闲置旧安卓手机通过 Termux PRoot 运行，低功耗 7x24 小时常驻：
-
-```bash
-# 1. 在 Termux PRoot 环境下下载 ARM64 裸文件
-curl -L -o miplay https://github.com/juneix/MiPlay/releases/latest/download/miplay-linux-arm64
-chmod +x miplay
-
-# 2. 守护进程模式后台运行 (手机锁屏不中断)
-./miplay serve -d
-
-# 3. 停止后台守护进程
-./miplay stop
-```
 
 ---
 
