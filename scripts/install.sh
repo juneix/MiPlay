@@ -26,7 +26,7 @@ REPO="juneix/MiPlay"
 GITHUB_API="https://api.github.com/repos/${REPO}/releases/latest"
 
 echo -e "${BLUE}====================================================${NC}"
-echo -e "${BLUE}        MiPlay AirPlay 桥接服务管理脚本             ${NC}"
+echo -e "${BLUE}        MiPlay 隔空妙播一键部署脚本             ${NC}"
 echo -e "${BLUE}====================================================${NC}"
 
 # ==================== 1. 卸载流程 ====================
