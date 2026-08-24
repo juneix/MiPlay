@@ -25,7 +25,9 @@ SERVICE_FILE="/etc/systemd/system/miplay.service"
 REPO="juneix/MiPlay"
 
 echo -e "${BLUE}====================================================${NC}"
-echo -e "${BLUE}        MiPlay 隔空妙播一键部署脚本             ${NC}"
+echo -e "${BLUE}               🔊 MiPlay 一键部署脚本               ${NC}"
+echo -e "${BLUE}            作者：@谢週五（犹豫 94 想买）           ${NC}"
+echo -e "${BLUE}             官网：https://5nav.eu.org             ${NC}"
 echo -e "${BLUE}====================================================${NC}"
 
 # ==================== 0. 安装源选择 ====================
@@ -186,7 +188,39 @@ EOF_MAC
     fi
 fi
 
-echo -e "\n${GREEN}🎉 MiPlay 安装成功！${NC}"
+# ==================== 6. 完成提示 ====================
+get_local_ip() {
+    local ip=""
+    # 1. 优先通过系统路由表获取主力出口 IP
+    if command -v ip >/dev/null 2>&1; then
+        ip=$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' | head -n 1)
+        if [ -z "$ip" ]; then
+            ip=$(ip -4 addr show scope global 2>/dev/null | awk '/inet / {print $2}' | cut -d/ -f1 | head -n 1)
+        fi
+    fi
+
+    # 2. macOS 或 ifconfig 兜底 (优先有线网卡 en0 / eth0)
+    if [ -z "$ip" ] && command -v ifconfig >/dev/null 2>&1; then
+        ip=$(ifconfig en0 2>/dev/null | awk '/inet / {print $2}' | grep -v '127.0.0.1' | head -n 1)
+        if [ -z "$ip" ]; then
+            ip=$(ifconfig eth0 2>/dev/null | awk '/inet / {print $2}' | grep -v '127.0.0.1' | head -n 1)
+        fi
+        if [ -z "$ip" ]; then
+            ip=$(ifconfig 2>/dev/null | awk '/inet / {print $2}' | grep -v '127.0.0.1' | grep -v '^169\.254\.' | head -n 1)
+        fi
+    fi
+
+    # 3. hostname -I 兜底
+    if [ -z "$ip" ] && command -v hostname >/dev/null 2>&1; then
+        ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+    fi
+
+    echo "${ip:-127.0.0.1}"
+}
+
+LOCAL_IP="$(get_local_ip)"
+
+echo -e "\n${GREEN}🎉 MiPlay 一键部署完毕！更多内容请访问：${BLUE}https://5nav.eu.org${NC}"
 echo -e "👉 桌面用户：双击桌面快捷方式或运行: ${GREEN}miplay-desktop${NC}"
 echo -e "👉 命令行/NAS用户：运行服务: ${GREEN}miplay serve -d${NC}，停止服务: ${GREEN}miplay stop${NC}"
-echo -e "👉 Web 控制台: ${BLUE}http://<本机IP>:8820${NC}\n"
+echo -e "👉 Web 控制台: ${BLUE}http://${LOCAL_IP}:8820${NC}\n"
