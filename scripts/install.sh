@@ -30,8 +30,8 @@ echo -e "${BLUE}====================================================${NC}"
 
 # ==================== 0. 安装源选择 ====================
 echo -e "${YELLOW}请选择安装环境与镜像源:${NC}"
-echo -e "  1) 国内源 (阿里云镜像源 + GHProxy 加速，推荐)"
-echo -e "  2) 国际源 (PyPI 官方源 + GitHub 直连)"
+echo -e "  1) 国内源 (GHProxy 加速 + 阿里云镜像源)"
+echo -e "  2) 国际源 (GitHub 直连 + PyPI 官方源)"
 echo -n "👉 请输入选项 [1/2] (回车默认 1): "
 read -r SOURCE_OPT < /dev/tty 2>/dev/null || read -r SOURCE_OPT || true
 SOURCE_OPT="${SOURCE_OPT:-1}"
@@ -137,9 +137,9 @@ echo -e "${GREEN}✓ uv 就绪: $(uv --version)${NC}"
 # ==================== 4. 安装 miplay-hub ====================
 echo -e "正在安装 ${GREEN}miplay-hub${NC}..."
 
-# 优先 PyPI 在线安装，失败时从 GitHub Releases wheel 兜底安装
-WHEEL_FALLBACK="${GH_PROXY}https://github.com/${REPO}/releases/latest/download/miplay-1.0.1-py3-none-any.whl"
-uv tool install --force miplay-hub || uv tool install --force "$WHEEL_FALLBACK"
+# 直接使用 uv tool install 安装
+# 若国内镜像源尚未同步完成，自动回退官方源
+uv tool install --force miplay-hub || uv tool install --force --default-index https://pypi.org/simple miplay-hub
 
 USER_BIN="$HOME/.local/bin/miplay"
 if [ ! -f "$USER_BIN" ]; then
