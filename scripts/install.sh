@@ -30,21 +30,21 @@ echo -e "${BLUE}====================================================${NC}"
 
 # ==================== 0. 安装源选择 ====================
 echo -e "${YELLOW}请选择安装环境与镜像源:${NC}"
-echo -e "  1) 国际源 (GitHub 直连 + PyPI 官方源)"
-echo -e "  2) 国内源 (GHProxy 加速 + 阿里云镜像源)"
+echo -e "  1) 国内源 (阿里云镜像源 + GHProxy 加速，推荐)"
+echo -e "  2) 国际源 (PyPI 官方源 + GitHub 直连)"
 echo -n "👉 请输入选项 [1/2] (回车默认 1): "
 read -r SOURCE_OPT < /dev/tty 2>/dev/null || read -r SOURCE_OPT || true
 SOURCE_OPT="${SOURCE_OPT:-1}"
 echo ""
 
 if [ "$SOURCE_OPT" = "2" ]; then
+    echo -e "${GREEN}✓ 已选择：国际官方源${NC}"
+    GH_PROXY=""
+else
     echo -e "${GREEN}✓ 已选择：国内镜像源${NC}"
     export UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/"
     export UV_PYTHON_INSTALL_MIRROR="https://ghproxy.net/https://github.com/astral-sh/python-build-standalone/releases/download"
     GH_PROXY="https://ghproxy.net/"
-else
-    echo -e "${GREEN}✓ 已选择：国际官方源${NC}"
-    GH_PROXY=""
 fi
 
 # ==================== 1. 卸载流程 ====================
@@ -139,7 +139,7 @@ echo -e "正在安装 ${GREEN}miplay-hub${NC}..."
 
 # 优先 PyPI 在线安装，失败时从 GitHub Releases wheel 兜底安装
 WHEEL_FALLBACK="${GH_PROXY}https://github.com/${REPO}/releases/latest/download/miplay-1.0.1-py3-none-any.whl"
-uv tool install --force miplay-hub 2>/dev/null || uv tool install --force "$WHEEL_FALLBACK"
+uv tool install --force miplay-hub || uv tool install --force "$WHEEL_FALLBACK"
 
 USER_BIN="$HOME/.local/bin/miplay"
 if [ ! -f "$USER_BIN" ]; then
