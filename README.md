@@ -130,7 +130,7 @@ docker run -d \
 ### 4、uv 一键安装 (Linux / macOS / Windows / Termux)
 
 a. **已有 uv 环境**：
-  > 直接运行 `uv tool install miplay`
+  > 直接运行 `uv tool install miplay-hub`
 
 b. 没有 uv 环境：
 

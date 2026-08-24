@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# MiPlay - Linux & Termux PRoot 一键安装与服务管理脚本 (2026 标准)
+# MiPlay - Linux, macOS & Termux 极速一键部署脚本 (2026 标准)
 #
 # 用法：
-#   一键安装并启动服务:
+#   一键安装并启动:
 #     curl -fsSL https://raw.githubusercontent.com/juneix/MiPlay/main/scripts/install.sh | bash
 #   一键卸载:
 #     curl -fsSL https://raw.githubusercontent.com/juneix/MiPlay/main/scripts/install.sh | bash -s -- --uninstall
@@ -23,11 +23,21 @@ BIN_PATH="${INSTALL_DIR}/${BIN_NAME}"
 SERVICE_FILE="/etc/systemd/system/miplay.service"
 
 REPO="juneix/MiPlay"
-GITHUB_API="https://api.github.com/repos/${REPO}/releases/latest"
 
 echo -e "${BLUE}====================================================${NC}"
 echo -e "${BLUE}        MiPlay 隔空妙播一键部署脚本             ${NC}"
 echo -e "${BLUE}====================================================${NC}"
+
+# ==================== 0. 网络环境探测与国内 CDN 加速配置 ====================
+GH_PROXY=""
+if ! curl -Is -m 1 https://github.com >/dev/null 2>&1; then
+    echo -e "${YELLOW}[!] 检测到国内网络环境，已自动激活高速 CDN 专线 (GHProxy & 阿里云镜像)${NC}"
+    GH_PROXY="https://ghproxy.net/"
+    export UV_INDEX_URL="https://mirrors.aliyun.com/pypi/simple/"
+    export UV_PYTHON_INSTALL_MIRROR="https://ghproxy.net/https://github.com/astral-sh/python-build-standalone/releases/download"
+else
+    echo -e "${GREEN}✓ 国际互联网直连就绪${NC}"
+fi
 
 # ==================== 1. 卸载流程 ====================
 if [ "$1" = "--uninstall" ] || [ "$1" = "uninstall" ]; then
@@ -41,100 +51,132 @@ if [ "$1" = "--uninstall" ] || [ "$1" = "uninstall" ]; then
         systemctl daemon-reload >/dev/null 2>&1 || true
     fi
 
+    # 删除 uv tool
+    if command -v uv >/dev/null 2>&1; then
+        uv tool uninstall miplay-hub >/dev/null 2>&1 || uv tool uninstall miplay >/dev/null 2>&1 || true
+    fi
+
     # 删除二进制文件
     if [ -f "$BIN_PATH" ]; then
         echo -e "正在清理可执行文件: ${BIN_PATH}..."
         rm -f "$BIN_PATH"
     fi
+    rm -f "$HOME/.local/bin/miplay" "$HOME/.local/bin/miplay-desktop" "$HOME/Desktop/MiPlay.command" 2>/dev/null || true
 
     echo -e "${GREEN}🎉 [✓] MiPlay 已成功卸载！${NC}"
     echo -e "${YELLOW}注：用户配置文件 ~/.config/miplay 已完整保留，如需彻底清除请手动执行: rm -rf ~/.config/miplay${NC}"
     exit 0
 fi
 
-# ==================== 2. 依赖环境检测与自动安装 (FFmpeg) ====================
-if ! command -v ffmpeg >/dev/null 2>&1; then
-    echo -e "${YELLOW}[!] 检测到系统未安装 FFmpeg 音频解码工具，正在自动安装...${NC}"
-    if command -v apt-get >/dev/null 2>&1; then
-        if [ "$(id -u)" -ne 0 ]; then
-            sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
-        else
-            apt-get update -qq && apt-get install -y -qq ffmpeg
-        fi
-    elif command -v yum >/dev/null 2>&1; then
-        if [ "$(id -u)" -ne 0 ]; then sudo yum install -y ffmpeg; else yum install -y ffmpeg; fi
-    elif command -v apk >/dev/null 2>&1; then
-        apk add --no-cache ffmpeg || true
-    elif command -v pacman >/dev/null 2>&1; then
-        if [ "$(id -u)" -ne 0 ]; then sudo pacman -Sy --noconfirm ffmpeg; else pacman -Sy --noconfirm ffmpeg; fi
-    elif command -v pkg >/dev/null 2>&1; then # Termux
-        pkg install -y ffmpeg || true
-    elif command -v brew >/dev/null 2>&1; then # macOS Homebrew
-        brew install ffmpeg || true
-    else
-        echo -e "${YELLOW}[!] 无法识别包管理器，请手动安装 FFmpeg: sudo apt install ffmpeg${NC}"
-    fi
+# ==================== 2. FFmpeg 可选交互检测与安装 ====================
+if command -v ffmpeg >/dev/null 2>&1; then
+    echo -e "${GREEN}✓ 已检测到系统 FFmpeg 音频转码引擎就绪${NC}"
 else
-    echo -e "${GREEN}✓ 已检测到系统 FFmpeg 音频解码引擎就绪${NC}"
+    echo -e "${YELLOW}[!] 检测到系统未安装 FFmpeg 音频转码引擎。${NC}"
+    echo -e "    ${BLUE}说明：小米音箱硬件原生支持 MP3/M4A/FLAC/WAV/M3U8 直连播放；仅在需要非标准音频流实时转码时才依赖 FFmpeg。${NC}"
+    
+    INSTALL_FFMPEG="n"
+    # 支持在 curl | bash 管道模式下通过 /dev/tty 读取用户交互选择
+    if [ -t 0 ]; then
+        read -r -p "👉 是否现在安装 FFmpeg？[y/N] (默认 N 跳过): " choice
+        INSTALL_FFMPEG="${choice:-n}"
+    elif [ -e /dev/tty ]; then
+        read -r -p "👉 是否现在安装 FFmpeg？[y/N] (默认 N 跳过): " choice < /dev/tty 2>/dev/null || choice="n"
+        INSTALL_FFMPEG="${choice:-n}"
+    fi
+
+    if [[ "$INSTALL_FFMPEG" =~ ^[Yy]$ ]]; then
+        echo -e "正在通过系统包管理器安装 FFmpeg..."
+        if command -v apk >/dev/null 2>&1; then # Alpine
+            apk add --no-cache ffmpeg
+        elif command -v apt-get >/dev/null 2>&1; then # Debian / Ubuntu
+            if [ "$(id -u)" -ne 0 ]; then
+                sudo apt-get update -qq && sudo apt-get install -y ffmpeg
+            else
+                apt-get update -qq && apt-get install -y ffmpeg
+            fi
+        elif command -v dnf >/dev/null 2>&1; then # Fedora / RHEL
+            if [ "$(id -u)" -ne 0 ]; then sudo dnf install -y ffmpeg; else dnf install -y ffmpeg; fi
+        elif command -v yum >/dev/null 2>&1; then # CentOS
+            if [ "$(id -u)" -ne 0 ]; then sudo yum install -y ffmpeg; else yum install -y ffmpeg; fi
+        elif command -v pacman >/dev/null 2>&1; then # Arch Linux
+            if [ "$(id -u)" -ne 0 ]; then sudo pacman -Sy --noconfirm ffmpeg; else pacman -Sy --noconfirm ffmpeg; fi
+        elif command -v pkg >/dev/null 2>&1; then # Termux
+            pkg install -y ffmpeg
+        elif command -v brew >/dev/null 2>&1; then # macOS Homebrew
+            brew install ffmpeg
+        else
+            echo -e "${YELLOW}[!] 无法识别包管理器，请后续手动安装: sudo apt install ffmpeg${NC}"
+        fi
+
+        if command -v ffmpeg >/dev/null 2>&1; then
+            echo -e "${GREEN}✓ FFmpeg 安装成功！${NC}"
+        fi
+    else
+        echo -e "${YELLOW}[i] 已跳过 FFmpeg 安装（后续可随时手动安装）。${NC}"
+    fi
 fi
 
-# ==================== 3. 环境与架构检测 ====================
-ARCH="$(uname -m)"
-case "$ARCH" in
-    x86_64|amd64)
-        ASSET_NAME="miplay-linux-amd64"
-        ;;
-    aarch64|arm64)
-        ASSET_NAME="miplay-linux-arm64"
-        ;;
-    *)
-        echo -e "${RED}[x] 暂不支持当前 CPU 架构: ${ARCH}${NC}"
-        exit 1
-        ;;
-esac
+# ==================== 3. 极速包管理器 uv 检测与安装 ====================
+if ! command -v uv >/dev/null 2>&1 && [ ! -f "$HOME/.local/bin/uv" ] && [ ! -f "$HOME/.cargo/bin/uv" ]; then
+    echo -e "${YELLOW}[!] 正在安装极速运行工具 uv...${NC}"
+    curl -LsSf "${GH_PROXY}https://astral.sh/uv/install.sh" | sh
+fi
 
-echo -e "检测到系统架构: ${GREEN}${ARCH}${NC} (匹配目标: ${ASSET_NAME})"
+# 注入环境变量
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/usr/local/bin:$PATH"
 
-# ==================== 3. 下载二进制裸文件 ====================
-echo -e "正在获取最新 Release 版本..."
-DOWNLOAD_URL="https://github.com/${REPO}/releases/latest/download/${ASSET_NAME}"
-
-echo -e "下载地址: ${BLUE}${DOWNLOAD_URL}${NC}"
-TMP_FILE="/tmp/${ASSET_NAME}"
-
-if command -v curl >/dev/null 2>&1; then
-    curl -fL --progress-bar -o "$TMP_FILE" "$DOWNLOAD_URL"
-elif command -v wget >/dev/null 2>&1; then
-    wget -q --show-progress -O "$TMP_FILE" "$DOWNLOAD_URL"
-else
-    echo -e "${RED}[x] 未检测到 curl 或 wget 工具，请先安装。${NC}"
+if ! command -v uv >/dev/null 2>&1; then
+    echo -e "${RED}[x] uv 安装失败，请检查网络或手动安装: curl -LsSf https://astral.sh/uv/install.sh | sh${NC}"
     exit 1
 fi
 
-chmod +x "$TMP_FILE"
+echo -e "${GREEN}✓ 极速运行引擎 uv 就绪: $(uv --version)${NC}"
 
-# 移动至 /usr/local/bin (需要 root 权限)
-if [ "$(id -u)" -ne 0 ]; then
-    echo -e "${YELLOW}移动二进制文件至 ${INSTALL_DIR} 需要 root 权限，请输入 sudo 密码：${NC}"
-    sudo mv "$TMP_FILE" "$BIN_PATH"
-else
-    mv "$TMP_FILE" "$BIN_PATH"
+# ==================== 4. 安装 miplay-hub ====================
+echo -e "正在安装/更新 ${GREEN}miplay-hub${NC}..."
+
+# 优先 PyPI 在线安装，失败时从 GitHub Releases wheel 兜底安装
+WHEEL_FALLBACK="${GH_PROXY}https://github.com/${REPO}/releases/latest/download/miplay-1.0.1-py3-none-any.whl"
+uv tool install --force miplay-hub 2>/dev/null || uv tool install --force "$WHEEL_FALLBACK"
+
+USER_BIN="$HOME/.local/bin/miplay"
+if [ ! -f "$USER_BIN" ]; then
+    USER_BIN="$(command -v miplay 2>/dev/null || true)"
 fi
 
-echo -e "${GREEN}✓ 二进制文件已成功安装到: ${BIN_PATH}${NC}"
+# 软链接到全局 /usr/local/bin (若有权限)
+if [ -n "$USER_BIN" ] && [ -f "$USER_BIN" ]; then
+    if [ "$(id -u)" -eq 0 ]; then
+        cp -f "$USER_BIN" "$BIN_PATH" 2>/dev/null || true
+    elif sudo -n true 2>/dev/null; then
+        sudo cp -f "$USER_BIN" "$BIN_PATH" 2>/dev/null || true
+    fi
+fi
 
-# ==================== 4. 注册 Systemd 后台自启服务 ====================
-if command -v systemctl >/dev/null 2>&1 && [ -d "/run/systemd/system" ]; then
+# ==================== 5. 注册后台自启服务或桌面快捷方式 ====================
+OS="$(uname -s)"
+if [ "$OS" = "Linux" ] && command -v systemctl >/dev/null 2>&1 && [ -d "/run/systemd/system" ]; then
     echo -e "正在注册 Systemd 开机自启服务..."
     if [ "$(id -u)" -ne 0 ]; then
-        sudo "$BIN_PATH" service install
+        sudo "$USER_BIN" service install || true
     else
-        "$BIN_PATH" service install
+        "$USER_BIN" service install || true
     fi
-else
-    echo -e "${YELLOW}[!] 检测到当前环境非 Systemd (例如 Android Termux)，跳过服务安装。${NC}"
-    echo -e "👉 建议使用守护模式后台运行: ${GREEN}${BIN_NAME} serve -d${NC}"
-    echo -e "👉 停止后台运行: ${GREEN}${BIN_NAME} stop${NC}"
+elif [ "$OS" = "Darwin" ]; then
+    DESKTOP_DIR="$HOME/Desktop"
+    if [ -d "$DESKTOP_DIR" ]; then
+        cat << 'EOF_MAC' > "$DESKTOP_DIR/MiPlay.command"
+#!/usr/bin/env bash
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+miplay-desktop &
+EOF_MAC
+        chmod +x "$DESKTOP_DIR/MiPlay.command"
+        echo -e "${GREEN}✓ 已在桌面生成启动快捷方式: ~/Desktop/MiPlay.command${NC}"
+    fi
 fi
 
-echo -e "\n${GREEN}🎉 安装完成！请在浏览器访问 Web 控制台: http://<服务器IP>:8820${NC}\n"
+echo -e "\n${GREEN}🎉 MiPlay 安装成功！${NC}"
+echo -e "👉 桌面用户：双击桌面快捷方式或运行: ${GREEN}miplay-desktop${NC}"
+echo -e "👉 命令行/NAS用户：运行服务: ${GREEN}miplay serve -d${NC}，停止服务: ${GREEN}miplay stop${NC}"
+echo -e "👉 Web 控制台: ${BLUE}http://<本机IP>:8820${NC}\n"
