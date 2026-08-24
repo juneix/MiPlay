@@ -32,8 +32,9 @@ echo -e "${BLUE}====================================================${NC}"
 echo -e "${YELLOW}请选择安装环境与镜像源:${NC}"
 echo -e "  1) 国际源 (GitHub 直连 + PyPI 官方源)"
 echo -e "  2) 国内源 (GHProxy 加速 + 阿里云镜像源)"
-echo -n "👉 请输入数字 [1/2] (默认 1): "
-read -r SOURCE_OPT < /dev/tty 2>/dev/null || read -r SOURCE_OPT || SOURCE_OPT="1"
+echo -n "👉 请输入选项 [1/2] (回车默认 1): "
+read -r SOURCE_OPT < /dev/tty 2>/dev/null || read -r SOURCE_OPT || true
+SOURCE_OPT="${SOURCE_OPT:-1}"
 echo ""
 
 if [ "$SOURCE_OPT" = "2" ]; then
@@ -120,7 +121,7 @@ fi
 # ==================== 3. 极速包管理器 uv 检测与安装 ====================
 if ! command -v uv >/dev/null 2>&1 && [ ! -f "$HOME/.local/bin/uv" ] && [ ! -f "$HOME/.cargo/bin/uv" ]; then
     echo -e "正在安装极速包管理器 uv..."
-    curl -LsSf "${GH_PROXY}https://astral.sh/uv/install.sh" | sh
+    curl -LsSf https://astral.sh/uv/install.sh | sh 2>/dev/null || curl -LsSf "${GH_PROXY}https://raw.githubusercontent.com/astral-sh/uv/main/assets/install/install.sh" | sh 2>/dev/null || true
 fi
 
 # 注入环境变量
