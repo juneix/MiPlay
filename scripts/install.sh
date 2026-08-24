@@ -158,11 +158,20 @@ fi
 # ==================== 5. 注册后台自启服务或桌面快捷方式 ====================
 OS="$(uname -s)"
 if [ "$OS" = "Linux" ] && command -v systemctl >/dev/null 2>&1 && [ -d "/run/systemd/system" ]; then
-    echo -e "正在注册 Systemd 开机自启服务..."
-    if [ "$(id -u)" -ne 0 ]; then
-        sudo "$USER_BIN" service install || true
+    echo -n "👉 是否开机自启动 MiPlay？[Y/n] (回车默认 Y): "
+    read -r AUTO_START < /dev/tty 2>/dev/null || read -r AUTO_START || true
+    AUTO_START="${AUTO_START:-y}"
+    echo ""
+
+    if [ "$AUTO_START" = "y" ] || [ "$AUTO_START" = "Y" ]; then
+        echo -e "正在注册 Systemd 开机自启服务..."
+        if [ "$(id -u)" -ne 0 ]; then
+            sudo "$USER_BIN" service install || true
+        else
+            "$USER_BIN" service install || true
+        fi
     else
-        "$USER_BIN" service install || true
+        echo -e "${YELLOW}[i] 已跳过开机自启（后续可随时手动运行: ${GREEN}miplay service install${YELLOW} 开启）。${NC}"
     fi
 elif [ "$OS" = "Darwin" ]; then
     DESKTOP_DIR="$HOME/Desktop"
